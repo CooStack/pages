@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CooStack</title>
+    <style>
+      :root {
+        --bg-color: #f8f9fa;
+        --card-bg: #ffffff;
+        --text-main: #2d3436;
+        --text-sub: #636e72;
+        --accent: #0984e3;
+        --border: #edf2f7;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: var(--bg-color);
+        color: var(--text-main);
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+      }
+
+      .wrapper {
+        width: 90%;
+        max-width: 800px;
+        padding: 40px 0;
+      }
+
+      header {
+        margin-bottom: 40px;
+        text-align: left;
+      }
+
+      header h1 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        letter-spacing: -0.5px;
+        margin: 0;
+      }
+
+      header p {
+        color: var(--text-sub);
+        font-size: 0.9rem;
+        margin-top: 8px;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 16px;
+      }
+
+      .item {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        padding: 20px;
+        border-radius: 12px;
+        text-decoration: none;
+        color: inherit;
+        transition: all 0.2s ease;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+      }
+
+      .item:hover {
+        border-color: var(--accent);
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+      }
+
+      .item .icon {
+        font-size: 1.2rem;
+        margin-bottom: 12px;
+      }
+
+      .item .title {
+        font-weight: 500;
+        font-size: 0.95rem;
+        margin-bottom: 4px;
+      }
+
+      .item .desc {
+        font-size: 0.75rem;
+        color: var(--text-sub);
+      }
+
+      footer {
+        margin-top: 50px;
+        font-size: 0.8rem;
+        color: #b2bec3;
+        text-align: center;
+      }
+
+      @media (max-width: 480px) {
+        .grid {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1>CooStack</h1>
+        <p>个人常用工具与资源导航</p>
+      </header>
+
+      <div class="grid">
+        <a href="bezier.html" class="item">
+          <div class="icon">🐙</div>
+          <div class="title">贝塞尔曲线生成工具</div>
+          <div class="desc">适用于CooStackParticle的贝塞尔曲线生成工具</div>
+        </a>
+
+        <a href="generator.html" class="item">
+          <div class="icon">💬</div>
+          <div class="title">粒子发射器可视化</div>
+          <div class="desc">用于生成CooStackParticle代码</div>
+        </a>
+      </div>
+
+      <footer>&copy; 2026 Created by CooStack.</footer>
+    </div>
+  </body>
+</html>
