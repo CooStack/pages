@@ -1026,7 +1026,7 @@ import * as THREE from 'three';
                 if (tLen < 1e-9) tang = anyPerpToAxis(axis); // ✅再兜底一次
                 else tang.multiplyScalar(1.0 / tLen);
 
-                const dvTan = tang.multiplyScalar(-angularSpeed);
+                const dvTan = tang.multiplyScalar(angularSpeed);
                 const err = radialDist - radius;
 
                 if (mode === "SNAP") {
