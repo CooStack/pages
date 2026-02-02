@@ -38,6 +38,7 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
     const chkGrid = document.getElementById("chkGrid");
     const chkAutoFit = document.getElementById("chkAutoFit");
     const chkSnapGrid = document.getElementById("chkSnapGrid");
+    const inpSnapStep = document.getElementById("inpSnapStep");
     const statusLinePick = document.getElementById("statusLinePick");
     const statusPoints = document.getElementById("statusPoints");
 
@@ -639,11 +640,18 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         hoverMarker.visible = false;
     }
 
-    function snapToGrid(p) {
+    function getSnapStep() {
+        const v = parseFloat(inpSnapStep?.value);
+        if (!Number.isFinite(v) || v <= 0) return 1;
+        return v;
+    }
+
+    function snapToGrid(p, step) {
+        const s = step || 1;
         return {
-            x: Math.round(p.x / GRID_STEP) * GRID_STEP,
+            x: Math.round(p.x / s) * s,
             y: p.y,
-            z: Math.round(p.z / GRID_STEP) * GRID_STEP
+            z: Math.round(p.z / s) * s
         };
     }
 
@@ -670,10 +678,11 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         let p = {x: hitVec3.x, y: 0, z: hitVec3.z};
 
         if (chkSnapGrid && chkSnapGrid.checked) {
-            p = snapToGrid(p);
+            p = snapToGrid(p, getSnapStep());
         } else {
             p = snapToNearestPointXZ(p, 0.35);
         }
+
         return p;
     }
 
@@ -717,6 +726,19 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
             if (chkAutoFit.checked) {
                 needAutoFit = true;      // 打开时允许做一次自动对焦
                 rebuildPreviewAndKotlin(); // 触发一次（只会对焦一次）
+            }
+        });
+        if (inpSnapStep) inpSnapStep.disabled = !(chkSnapGrid && chkSnapGrid.checked);
+
+        chkSnapGrid?.addEventListener("change", () => {
+            if (inpSnapStep) inpSnapStep.disabled = !chkSnapGrid.checked;
+        });
+
+        inpSnapStep?.addEventListener("input", () => {
+            // 拾取模式下，步长改变时让红点立刻更新一次
+            if (linePickMode) {
+                // 触发一次 move 逻辑最简单：直接隐藏，下一次 move 会刷新
+                // 或者你也可以在这里主动调用 showHoverMarker(当前映射点)
             }
         });
         animate();
