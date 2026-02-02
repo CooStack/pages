@@ -324,6 +324,23 @@ body {
     overflow: hidden;
 }
 
+/* ✅ 聚焦高亮：让用户一眼看出当前聚焦的卡片 */
+.card.focused {
+    border-color: rgba(78, 161, 255, .55);
+    box-shadow: 0 0 0 1px rgba(78, 161, 255, .18), 0 12px 30px rgba(0, 0, 0, .32);
+}
+
+.card.focused .card-head {
+    background: rgba(78, 161, 255, .12);
+    border-bottom-color: rgba(78, 161, 255, .22);
+}
+
+.card.focused .badge2 {
+    border-color: rgba(78, 161, 255, .28);
+    color: rgba(255, 255, 255, .92);
+    background: rgba(78, 161, 255, .08);
+}
+
 .card.dragging {
     opacity: .75
 }
@@ -336,6 +353,8 @@ body {
     border-bottom: 1px solid var(--line);
     background: rgba(0, 0, 0, .16);
     min-width: 0;
+    /* ✅ 嵌套 withBuilder 宽度变窄时：允许换行，避免右侧按钮拥挤 */
+    flex-wrap: wrap;
 }
 
 .card-title {
@@ -385,6 +404,32 @@ body {
     align-items: center;
     gap: 6px;
     margin-left: 6px;
+    /* ✅ 按钮多时换行，不再把标题挤没 */
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+/* ✅ 子卡片更紧凑：嵌套层级多时减少“按钮拥挤” */
+.subcards .card-head{
+    gap: 6px;
+    padding: 8px 8px 6px;
+}
+.subcards .handle{
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+}
+.subcards .title-text{
+    font-size: 12px;
+}
+.subcards .iconbtn{
+    width: 24px;
+    height: 24px;
+    border-radius: 8px;
+}
+.subcards .card-actions{
+    gap: 4px;
+    margin-left: auto;
 }
 
 .iconbtn {
@@ -494,12 +539,30 @@ select.input {
     justify-content: space-between;
     gap: 8px;
     margin-bottom: 8px;
+    /* ✅ 嵌套时标题与按钮分两行，避免一行挤爆 */
+    flex-wrap: wrap;
 }
 
 .subblock-title {
     font-weight: 700;
     font-size: 12px;
     color: rgba(255, 255, 255, .86);
+    flex: 1 1 100%;
+}
+
+/* ✅ 子Builder操作按钮：占满整行并可换行 */
+.subblock-head .mini{
+    flex: 1 1 100%;
+    justify-content: flex-start;
+}
+
+/* ✅ 子Builder 内的按钮更紧凑（嵌套多层时） */
+.subblock-head .mini{ gap: 6px; }
+.subblock-head .mini .btn.small{
+    height: 26px;
+    padding: 0 6px;
+    border-radius: 9px;
+    font-size: 12px;
 }
 
 .subcards {
@@ -512,9 +575,13 @@ select.input {
 .modal-mask {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, .55);
+    background: rgba(12, 14, 24, .52);
     z-index: 50;
+    backdrop-filter: blur(14px) saturate(1.2);
+    -webkit-backdrop-filter: blur(14px) saturate(1.2);
 }
+
+
 
 .modal {
     position: fixed;
@@ -523,7 +590,7 @@ select.input {
     transform: translate(-50%, -50%);
     width: min(860px, 92vw);
     height: min(560px, 80vh);
-    background: linear-gradient(180deg, rgba(255, 255, 255, .03), rgba(0, 0, 0, .35));
+    background: linear-gradient(180deg, rgba(20, 26, 56, .72), rgba(0, 0, 0, .45));
     border: 1px solid var(--line2);
     border-radius: 18px;
     box-shadow: var(--shadow);
@@ -531,7 +598,10 @@ select.input {
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
 }
+
 
 .modal-head {
     padding: 12px 12px 10px;
@@ -577,6 +647,34 @@ select.input {
     flex-direction: column;
     gap: 10px;
 }
+
+/* ✅ 快捷键设置：列表内容可滚动，避免看不到下面 */
+#hkModal .modal-body{
+    overflow: hidden;
+}
+#hkList{
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 4px;
+}
+#hkList::-webkit-scrollbar{ width: 10px; }
+#hkList::-webkit-scrollbar-thumb{
+    background: rgba(255, 255, 255, .12);
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
+#hkList::-webkit-scrollbar-thumb:hover{
+    background: rgba(255, 255, 255, .18);
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
+
+/* ✅ 快捷键行在窄宽度下换行 */
+.hk-row{ flex-wrap: wrap; align-items: flex-start; }
+.hk-btns{ flex-wrap: wrap; }
 
 .modal-foot {
     padding: 10px 12px;
@@ -701,3 +799,70 @@ select.input {
     background-clip: content-box;
 }
 .three-host { touch-action: none; }
+
+/* =============================
+   Hotkeys Modal（快捷键设置）
+   - 解决：没有滚动条看不到下面内容
+   - 解决：窄屏时一行挤爆
+   ============================= */
+
+/* 热键列表滚动：modal 本身 overflow:hidden，所以把滚动放在 hkList */
+#hkModal .modal-body{ overflow: hidden; }
+#hkList{
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 4px;
+}
+
+#hkList::-webkit-scrollbar{ width: 10px; }
+#hkList::-webkit-scrollbar-thumb{
+    background: rgba(255,255,255,.12);
+    border-radius: 10px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
+#hkList::-webkit-scrollbar-thumb:hover{
+    background: rgba(255,255,255,.18);
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
+
+.hk-list{ display:flex; flex-direction:column; gap:10px; }
+.hk-section{ border:1px solid var(--line); border-radius:14px; padding:10px; background:rgba(0,0,0,.10); }
+.hk-section-title{ font-weight:800; font-size:12px; color:rgba(255,255,255,.86); margin-bottom:8px; }
+.hk-row{ display:flex; align-items:center; gap:10px; padding:10px; border:1px solid var(--line); border-radius:12px; background:rgba(0,0,0,.12); flex-wrap:wrap; }
+.hk-name{ flex:1 1 240px; min-width:0; }
+.hk-name .t{ font-weight:800; }
+.hk-name .d{ font-size:12px; color:var(--muted); }
+.hk-key{ flex:0 0 auto; min-width:90px; text-align:center; font-size:12px; padding:6px 10px; border-radius:999px; border:1px solid var(--line2); background:rgba(255,255,255,.04); color:rgba(255,255,255,.92); }
+.hk-key.empty{ color:var(--muted2); background:rgba(0,0,0,.12); }
+.hk-btns{ display:flex; gap:8px; flex:0 0 auto; flex-wrap:wrap; }
+
+/* 添加卡片 picker 内的快捷键提示 */
+.pickitem{ position:relative; }
+.hkbad{ position:absolute; right:10px; top:10px; font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--line2); background:rgba(0,0,0,.18); color:var(--muted); }
+.sethk{ position:absolute; right:10px; bottom:10px; width:30px; height:30px; border-radius:10px; border:1px solid var(--line2); background:rgba(255,255,255,.03); color:var(--text); cursor:pointer; }
+.sethk:hover{ background:rgba(255,255,255,.06); border-color:rgba(255,255,255,.20); }
+
+
+/* -------------------------
+   Modal stacking & frosted polish
+   ------------------------- */
+/* 让快捷键窗口永远盖在添加卡片窗口之上（即使两者都打开） */
+#modalMask{ z-index: 50; }
+#modal{ z-index: 60; }
+#hkMask{ z-index: 70; }
+#hkModal{ z-index: 80; }
+
+/* 当快捷键弹窗打开时，把添加卡片弹窗置为底层磨砂，避免叠窗可读性差 */
+.modal.under{
+    filter: blur(10px);
+    opacity: .22;
+    transform: translate(-50%, -50%) scale(.98);
+    pointer-events: none;
+}
+.modal-mask.under{
+    display: none !important;
+}

@@ -11,9 +11,16 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
     const elCardsRoot = document.getElementById("cardsRoot");
     const elKotlinOut = document.getElementById("kotlinOut");
 
+    // 用户要求：右侧 Kotlin 代码栏只读（可复制，不可编辑）
+    if (elKotlinOut) {
+        try { elKotlinOut.readOnly = true; } catch {}
+        try { elKotlinOut.setAttribute("readonly", ""); } catch {}
+    }
+
     const btnAddCard = document.getElementById("btnAddCard");
     const btnQuickOffset = document.getElementById("btnQuickOffset");
     const btnPickLine = document.getElementById("btnPickLine");
+    const btnHotkeys = document.getElementById("btnHotkeys");
     const btnFullscreen = document.getElementById("btnFullscreen");
 
     const btnExportKotlin = document.getElementById("btnExportKotlin");
@@ -34,6 +41,21 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
     const btnCancelModal = document.getElementById("btnCancelModal");
     const cardPicker = document.getElementById("cardPicker");
     const cardSearch = document.getElementById("cardSearch");
+
+    // -------------------------
+    // Hotkeys DOM
+    // -------------------------
+    const hkModal = document.getElementById("hkModal");
+    const hkMask = document.getElementById("hkMask");
+    const hkSearch = document.getElementById("hkSearch");
+    const hkList = document.getElementById("hkList");
+    const hkHint = document.getElementById("hkHint");
+    const btnCloseHotkeys = document.getElementById("btnCloseHotkeys");
+    const btnCloseHotkeys2 = document.getElementById("btnCloseHotkeys2");
+    const btnHotkeysReset = document.getElementById("btnHotkeysReset");
+    const btnHotkeysExport = document.getElementById("btnHotkeysExport");
+    const btnHotkeysImport = document.getElementById("btnHotkeysImport");
+    const fileHotkeys = document.getElementById("fileHotkeys");
 
     const threeHost = document.getElementById("threeHost");
     const chkAxes = document.getElementById("chkAxes");
@@ -63,6 +85,180 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
     function relExpr(x, y, z) {
         return `RelativeLocation(${U.fmt(num(x))}, ${U.fmt(num(y))}, ${U.fmt(num(z))})`;
     }
+
+
+    // -------------------------
+    // Hotkeys + Download helpers
+    // -------------------------
+    const HOTKEY_STORAGE_KEY = "pb_hotkeys_v1";
+
+    const DEFAULT_HOTKEYS = {
+        version: 1,
+        actions: {
+            openPicker: "KeyW",          // W
+            pickLineXZ: "KeyQ",          // Q
+            undo: "Mod+KeyZ",            // Ctrl/Cmd + Z
+            redo: "Mod+Shift+KeyZ",      // Ctrl/Cmd + Shift + Z
+            // 删除聚焦卡片（Mac 键盘上的“Delete”通常对应 Backspace；更通用）
+            deleteFocused: "Backspace",
+        },
+        kinds: {},
+    };
+
+    function normalizeHotkey(hk) {
+        if (!hk || typeof hk !== "string") return "";
+        const parts = hk.split("+").map(s => s.trim()).filter(Boolean);
+        const hasMod = parts.includes("Mod");
+        const hasShift = parts.includes("Shift");
+        const hasAlt = parts.includes("Alt");
+        const main = parts.find(p => p !== "Mod" && p !== "Shift" && p !== "Alt") || "";
+        const out = [];
+        if (hasMod) out.push("Mod");
+        if (hasShift) out.push("Shift");
+        if (hasAlt) out.push("Alt");
+        if (main) out.push(main);
+        return out.join("+");
+    }
+
+    function eventToHotkey(e) {
+        const parts = [];
+        if (e.ctrlKey || e.metaKey) parts.push("Mod");
+        if (e.shiftKey) parts.push("Shift");
+        if (e.altKey) parts.push("Alt");
+
+        const code = e.code || "";
+        const isModifierCode = (
+            code === "ShiftLeft" || code === "ShiftRight" ||
+            code === "ControlLeft" || code === "ControlRight" ||
+            code === "AltLeft" || code === "AltRight" ||
+            code === "MetaLeft" || code === "MetaRight"
+        );
+        if (code && !isModifierCode) parts.push(code);
+        return normalizeHotkey(parts.join("+"));
+    }
+
+    function hotkeyToHuman(hk) {
+        hk = normalizeHotkey(hk);
+        if (!hk) return "";
+        const parts = hk.split("+");
+        const out = parts.map(p => {
+            if (p === "Mod") return "Ctrl/Cmd";
+            if (p === "Shift") return "Shift";
+            if (p === "Alt") return "Alt";
+                        if (p.startsWith("Key")) return p.slice(3).toUpperCase();
+            if (p.startsWith("Digit")) return p.slice(5);
+            if (p === "Space") return "Space";
+            if (p === "Escape") return "Esc";
+            if (p === "Backspace") return "Backspace";
+            if (p === "Enter") return "Enter";
+            if (p.startsWith("Arrow")) return p.replace("Arrow", "");
+            return p;
+        });
+        return out.join("+");
+    }
+
+    function hotkeyMatchEvent(e, hk) {
+        hk = normalizeHotkey(hk);
+        if (!hk) return false;
+        return eventToHotkey(e) === hk;
+    }
+
+    function shouldIgnorePlainHotkeys() {
+        const ae = document.activeElement;
+        if (!ae) return false;
+        const tag = (ae.tagName || "").toUpperCase();
+        if (tag === "INPUT") {
+            const type = (ae.type || "text").toLowerCase();
+            // number 输入允许快捷键触发（避免影响常用工作流）
+            if (type === "number") return false;
+            return true;
+        }
+        if (tag === "TEXTAREA") {
+            // 右侧 Kotlin 代码栏只读，但用户希望快捷键（W/Q等）依然可用
+            if (ae.id === "kotlinOut" && ae.readOnly) return false;
+            return true;
+        }
+        if (ae.isContentEditable) return true;
+        return false;
+    }
+
+    function downloadText(filename, text, mime = "text/plain") {
+        const blob = new Blob([text], { type: `${mime};charset=utf-8` });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = filename || "download.txt";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 200);
+    }
+
+    function loadHotkeys() {
+        try {
+            const raw = localStorage.getItem(HOTKEY_STORAGE_KEY);
+            if (raw) {
+                const obj = JSON.parse(raw);
+                const out = {
+                    version: 1,
+                    actions: Object.assign({}, DEFAULT_HOTKEYS.actions),
+                    kinds: {},
+                };
+                if (obj && typeof obj === "object") {
+                    if (obj.actions && typeof obj.actions === "object") {
+                        Object.assign(out.actions, obj.actions);
+                    }
+                    if (obj.kinds && typeof obj.kinds === "object") {
+                        out.kinds = Object.assign({}, obj.kinds);
+                    }
+                }
+                // normalize
+                for (const k of Object.keys(out.actions)) out.actions[k] = normalizeHotkey(out.actions[k]);
+                for (const k of Object.keys(out.kinds)) out.kinds[k] = normalizeHotkey(out.kinds[k]);
+                return out;
+            }
+        } catch (e) {
+            console.warn("loadHotkeys failed:", e);
+        }
+        return JSON.parse(JSON.stringify(DEFAULT_HOTKEYS));
+    }
+
+    function saveHotkeys() {
+        try {
+            localStorage.setItem(HOTKEY_STORAGE_KEY, JSON.stringify(hotkeys));
+        } catch (e) {
+            console.warn("saveHotkeys failed:", e);
+        }
+        refreshHotkeyHints();
+    }
+
+    function resetHotkeys() {
+        hotkeys = JSON.parse(JSON.stringify(DEFAULT_HOTKEYS));
+        saveHotkeys();
+        renderHotkeysList();
+    }
+
+    function removeHotkeyConflicts(hk, except = null) {
+        hk = normalizeHotkey(hk);
+        if (!hk) return;
+
+        // 清理重复绑定（同一个按键只能绑定一个功能）
+        for (const [id, v] of Object.entries(hotkeys.actions || {})) {
+            if (except && except.type === "action" && except.id === id) continue;
+            if (normalizeHotkey(v) === hk) hotkeys.actions[id] = "";
+        }
+        for (const [kind, v] of Object.entries(hotkeys.kinds || {})) {
+            if (except && except.type === "kind" && except.id === kind) continue;
+            if (normalizeHotkey(v) === hk) delete hotkeys.kinds[kind];
+        }
+    }
+
+    // load hotkeys once
+    let hotkeys = loadHotkeys();
+    // 关键动作快捷键不允许为空（否则用户会出现“按 W/Q 没反应”的体验）
+    for (const k of Object.keys(DEFAULT_HOTKEYS.actions)) {
+        if (!hotkeys.actions[k]) hotkeys.actions[k] = DEFAULT_HOTKEYS.actions[k];
+    }
+
 
     // -------------------------
     // KIND
@@ -575,11 +771,6 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         };
         if (init.params) Object.assign(n.params, init.params);
         if (init.folded !== undefined) n.folded = !!init.folded;
-
-        // ✅ withBuilder 子 PointsBuilder：默认也有一个 axis 卡片（与外部一致）
-        if (kind === "with_builder" && (!n.children || n.children.length === 0)) {
-            n.children = [makeNode("axis", {params: {x: 0, y: 1, z: 0}})];
-        }
         // FourierSeries：terms 初始化空即可
         return n;
     }
@@ -609,9 +800,234 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         root: {
             id: "root",
             kind: "ROOT",
-            children: [makeNode("axis", {params: {x: 0, y: 1, z: 0}})]
-        }
+            children: []}
     };
+
+    // -------------------------
+    // focus/render flags
+    // -------------------------
+    // 渲染卡片列表时会触发 focusout（DOM 被重建）。这些 focus 事件不应写入历史，也不应清空聚焦。
+    let suppressFocusHistory = false;
+    let isRenderingCards = false;
+
+    // -------------------------
+    // History (Undo / Redo)
+    // -------------------------
+    // 撤销栈容量（用户要求“变大一点”）
+    const HISTORY_MAX = 800;
+    const undoStack = [];
+    const redoStack = [];
+    let isRestoringHistory = false;
+
+    function deepClone(x) {
+        return JSON.parse(JSON.stringify(x));
+    }
+
+    function historyCapture(reason = "") {
+        if (isRestoringHistory) return;
+        try {
+            const snap = { state: deepClone(state), focusedNodeId: focusedNodeId || null };
+            const last = undoStack.length ? undoStack[undoStack.length - 1] : null;
+            // ✅ 允许“仅焦点变化”入栈：state 相同但 focusedNodeId 不同也要记录
+            if (last) {
+                const sameState = (JSON.stringify(last.state) === JSON.stringify(snap.state));
+                const sameFocus = ((last.focusedNodeId || null) === (snap.focusedNodeId || null));
+                if (sameState && sameFocus) return;
+            }
+            undoStack.push(snap);
+            if (undoStack.length > HISTORY_MAX) undoStack.shift();
+            redoStack.length = 0;
+        } catch (e) {
+            console.warn("historyCapture failed:", reason, e);
+        }
+    }
+
+
+    function restoreSnapshot(snap) {
+        isRestoringHistory = true;
+        try {
+            stopLinePick?.(); // 取消拾取模式，避免状态错乱
+        } catch {}
+        try {
+            state = deepClone(snap.state);
+            focusedNodeId = snap.focusedNodeId || null;
+        } finally {
+            isRestoringHistory = false;
+        }
+        suppressFocusHistory = true;
+        renderAll();
+        suppressFocusHistory = false;
+        // 尝试恢复焦点（不强制，避免打断用户）
+        requestAnimationFrame(() => {
+            if (!focusedNodeId) return;
+            const el = document.querySelector(`.card[data-id="${focusedNodeId}"]`);
+            if (el) {
+                try { el.scrollIntoView({block: "nearest"}); } catch {}
+            }
+            updateFocusColors?.();
+            updateFocusCardUI?.();
+        });
+    }
+
+    function historyUndo() {
+        if (!undoStack.length) return;
+        const snap = undoStack.pop();
+        redoStack.push({ state: deepClone(state), focusedNodeId: focusedNodeId || null });
+        restoreSnapshot(snap);
+    }
+
+    function historyRedo() {
+        if (!redoStack.length) return;
+        const snap = redoStack.pop();
+        undoStack.push({ state: deepClone(state), focusedNodeId: focusedNodeId || null });
+        restoreSnapshot(snap);
+    }
+
+    // 输入控件 focus 时只 capture 一次（开始编辑的那一刻）
+    function armHistoryOnFocus(el, reason = "edit") {
+        if (!el) return;
+        if (el.__pbHistoryArmed) return;
+        el.__pbHistoryArmed = true;
+        el.addEventListener("focus", () => {
+            if (isRestoringHistory) return;
+            if (!el.__pbHistoryCaptured) {
+                el.__pbHistoryCaptured = true;
+                historyCapture(reason);
+            }
+        });
+        el.addEventListener("blur", () => {
+            el.__pbHistoryCaptured = false;
+        });
+    }
+
+    // 用户要求：左侧卡片允许“全部删除”（不再强制至少保留 axis）。
+    // PointsBuilder 本身 axis 默认是 y 轴，因此 UI 不必强制插入 axis 卡片。
+    function ensureAxisInList(_list) {
+        // no-op
+    }
+
+    function ensureAxisEverywhere() {
+        // no-op
+    }
+
+    function forEachNode(list, fn) {
+        const arr = list || [];
+        for (const n of arr) {
+            if (!n) continue;
+            fn(n);
+            if (n.kind === "with_builder" && Array.isArray(n.children)) {
+                forEachNode(n.children, fn);
+            }
+        }
+    }
+
+    function findNodeContextById(id, list = state.root.children, parentNode = null) {
+        const arr = list || [];
+        for (let i = 0; i < arr.length; i++) {
+            const n = arr[i];
+            if (!n) continue;
+            if (n.id === id) return { node: n, parentList: arr, index: i, parentNode };
+            if (n.kind === "with_builder" && Array.isArray(n.children)) {
+                const r = findNodeContextById(id, n.children, n);
+                if (r) return r;
+            }
+        }
+        return null;
+    }
+
+    // ✅ 支持“删除聚焦卡片”：不仅能找到普通卡片，也能找到 add_fourier_series 的 term 子卡片
+    function findAnyCardContextById(id, list = state.root.children, parentNode = null) {
+        const arr = list || [];
+        for (let i = 0; i < arr.length; i++) {
+            const n = arr[i];
+            if (!n) continue;
+            if (n.id === id) return { type: "node", node: n, parentList: arr, index: i, parentNode };
+
+            // Fourier 子卡片（terms）
+            if (n.kind === "add_fourier_series" && Array.isArray(n.terms)) {
+                for (let ti = 0; ti < n.terms.length; ti++) {
+                    const t = n.terms[ti];
+                    if (t && t.id === id) {
+                        return { type: "term", term: t, parentList: n.terms, index: ti, parentNode: n };
+                    }
+                }
+            }
+
+            if (n.kind === "with_builder" && Array.isArray(n.children)) {
+                const r = findAnyCardContextById(id, n.children, n);
+                if (r) return r;
+            }
+        }
+        return null;
+    }
+
+    function pickReasonableFocusAfterDelete(ctx) {
+        try {
+            const list = ctx?.parentList;
+            if (Array.isArray(list) && list.length) {
+                const i = Math.max(0, Math.min(ctx.index, list.length - 1));
+                const cand = list[i] || list[i - 1];
+                if (cand && cand.id) return cand.id;
+            }
+            if (ctx?.parentNode && ctx.parentNode.id) return ctx.parentNode.id;
+        } catch {}
+        return null;
+    }
+
+    function deleteFocusedCard() {
+        if (!focusedNodeId) return false;
+        const ctx = findAnyCardContextById(focusedNodeId);
+        if (!ctx || !Array.isArray(ctx.parentList)) {
+            // 找不到：清空焦点即可
+            setFocusedNode(null, true);
+            return false;
+        }
+
+        historyCapture("delete_focused");
+
+        // 删除
+        ctx.parentList.splice(ctx.index, 1);
+
+        // 删除后合理地保留焦点（不额外写历史，由 delete_focused 这一条快照承载）
+        const nextFocus = pickReasonableFocusAfterDelete(ctx);
+        setFocusedNode(nextFocus, false);
+
+        ensureAxisEverywhere();
+        renderAll();
+        return true;
+    }
+
+    function nodeContainsId(node, id) {
+        if (!node) return false;
+        if (node.id === id) return true;
+        if (node.kind === "with_builder" && Array.isArray(node.children)) {
+            for (const c of node.children) if (nodeContainsId(c, id)) return true;
+        }
+        return false;
+    }
+
+    function moveNodeById(dragId, targetList, targetIndex, targetOwnerNode = null) {
+        if (!dragId || !Array.isArray(targetList)) return false;
+
+        const from = findNodeContextById(dragId);
+        if (!from) return false;
+
+        // 不能把节点拖进自己的子树（目标 owner 在拖拽节点子树中）
+        if (targetOwnerNode && nodeContainsId(from.node, targetOwnerNode.id)) return false;
+
+        const fromList = from.parentList;
+        const fromIndex = from.index;
+
+        const [moved] = fromList.splice(fromIndex, 1);
+
+        let idx = Math.max(0, Math.min(targetIndex, targetList.length));
+        if (fromList === targetList && fromIndex < idx) idx -= 1;
+        targetList.splice(idx, 0, moved);
+
+        ensureAxisEverywhere();
+        return true;
+    }
+
 
     // -------------------------
     // Eval（同时计算：每个卡片新增的点在最终点数组里的区间，用于高亮）
@@ -714,6 +1130,8 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
 
     // ✅ 点高亮：卡片获得焦点时，让该卡片“直接新增”的粒子变色
     let nodePointSegments = new Map(); // nodeId -> {start,end}
+    let pointOwnerByIndex = null; // pointIndex -> nodeId（更细粒度优先）
+    let suppressCardFocusOutClear = false; // 预览区点击时避免 focusout 清空焦点
     let focusedNodeId = null;          // 当前聚焦的卡片 id（或 null）
     let defaultColorBuf = null;        // Float32Array：默认颜色缓存（与 position 等长）
     const DEFAULT_POINT_HEX = 0xffffff;
@@ -726,6 +1144,12 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
     let picked = [];
     let linePickTargetList = null;
     let linePickTargetLabel = "主Builder";
+    // 插入位置（用于：在某个卡片后/某个 withBuilder 子列表末尾连续插入）
+    let linePickInsertIndex = null;
+    // 进入拾取前的聚焦卡片（用于：拾取新增后保持聚焦不丢失）
+    let linePickKeepFocusId = null;
+    // ✅ 解决：拾取直线时 pointerdown 处理完后仍会触发 click 事件，可能导致焦点被 onCanvasClick 清空
+    let suppressNextCanvasClick = false;
     let needAutoFit = true
 
     let _rClickT = 0;
@@ -954,6 +1378,7 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         renderer.domElement.addEventListener("pointerdown", onPointerDown);
         renderer.domElement.addEventListener("pointermove", onPointerMove);
         renderer.domElement.addEventListener("pointerup", onPointerUp);
+        renderer.domElement.addEventListener("click", onCanvasClick);
 
         chkAxes.addEventListener("change", () => axesHelper.visible = chkAxes.checked);
         chkGrid.addEventListener("change", () => gridHelper.visible = chkGrid.checked);
@@ -1089,19 +1514,142 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         attr.needsUpdate = true;
     }
 
-    function setFocusedNode(id) {
-        const next = id || null;
-        if (focusedNodeId === next) return;
-        focusedNodeId = next;
-        updateFocusColors();
+    // ✅ 左侧卡片聚焦高亮（UI）
+    function updateFocusCardUI() {
+        if (!elCardsRoot) return;
+        try {
+            elCardsRoot.querySelectorAll('.card.focused').forEach(el => el.classList.remove('focused'));
+        } catch {}
+        if (!focusedNodeId) return;
+        const el = elCardsRoot.querySelector(`.card[data-id="${focusedNodeId}"]`);
+        if (el) el.classList.add('focused');
     }
 
-    function clearFocusedNodeIf(id) {
+    function setFocusedNode(id, recordHistory = true) {
+        const next = id || null;
+        if (focusedNodeId === next) return;
+        if (recordHistory && !isRestoringHistory && !suppressFocusHistory && !isRenderingCards) {
+            historyCapture("focus_change");
+        }
+        focusedNodeId = next;
+        updateFocusColors();
+        updateFocusCardUI();
+    }
+
+    function clearFocusedNodeIf(id, recordHistory = true) {
         if (!id) return;
         if (focusedNodeId !== id) return;
+        if (recordHistory && !isRestoringHistory && !suppressFocusHistory && !isRenderingCards) {
+            historyCapture("focus_clear");
+        }
         focusedNodeId = null;
         updateFocusColors();
+        updateFocusCardUI();
     }
+
+
+function buildPointOwnerByIndex(totalCount, segments) {
+    const owners = new Array(totalCount || 0);
+    if (!segments) return owners;
+    for (const [id, seg] of segments.entries()) {
+        if (!seg) continue;
+        const s = Math.max(0, (seg.start | 0));
+        const e = Math.min(owners.length, (seg.end | 0));
+        for (let i = s; i < e; i++) owners[i] = id; // 后写入的更细粒度（子卡片）会覆盖父段
+    }
+    return owners;
+}
+
+function ownerIdForPointIndex(i) {
+    if (i === null || i === undefined) return null;
+    if (pointOwnerByIndex && pointOwnerByIndex[i]) return pointOwnerByIndex[i];
+    // fallback：在 segments 里找“最短段”（更细粒度）
+    let best = null;
+    let bestLen = Infinity;
+    for (const [id, seg] of nodePointSegments.entries()) {
+        if (!seg) continue;
+        if (i >= seg.start && i < seg.end) {
+            const len = seg.end - seg.start;
+            if (len < bestLen) {
+                bestLen = len;
+                best = id;
+            }
+        }
+    }
+    return best;
+}
+
+function pickPointIndexFromEvent(ev) {
+    if (!pointsObj || !renderer || !camera || !raycaster) return null;
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -(((ev.clientY - rect.top) / rect.height) * 2 - 1);
+    raycaster.setFromCamera(mouse, camera);
+    // Points 的阈值是“世界坐标”，这里给一个随点大小变化的经验值
+    raycaster.params.Points = raycaster.params.Points || {};
+    raycaster.params.Points.threshold = Math.max(0.06, (pointSize || 0.2) * 0.25);
+    const hits = raycaster.intersectObject(pointsObj, false);
+    if (!hits || hits.length === 0) return null;
+    const idx = hits[0].index;
+    return (idx === undefined || idx === null) ? null : idx;
+}
+
+function scrollCardToTop(cardEl) {
+    if (!cardEl || !elCardsRoot) return;
+    const c = elCardsRoot;
+    const cr = c.getBoundingClientRect();
+    const r = cardEl.getBoundingClientRect();
+    const delta = (r.top - cr.top);
+    // 让卡片顶端尽量贴近容器顶端
+    c.scrollTop += delta - 8;
+}
+
+function focusCardById(id, recordHistory = true, scrollToTop = true) {
+    if (!id) return false;
+    setFocusedNode(id, recordHistory);
+    requestAnimationFrame(() => {
+        const el = elCardsRoot ? elCardsRoot.querySelector(`.card[data-id="${id}"]`) : null;
+        if (el) {
+            try { el.focus({ preventScroll: true }); } catch { try { el.focus(); } catch {} }
+            if (scrollToTop) {
+                try { scrollCardToTop(el); } catch {}
+            }
+        }
+    });
+    return true;
+}
+
+function onCanvasClick(ev) {
+    // ✅ 直线拾取用 pointerdown 处理，但浏览器仍会在 pointerup 后补一个 click。
+    // 如果不屏蔽，这个 click 会走到下面的“点到空白处清空焦点”，导致聚焦丢失。
+    if (suppressNextCanvasClick) {
+        suppressNextCanvasClick = false;
+        return;
+    }
+
+    // XZ 拾取模式中由 onPointerDown 处理；此处不抢逻辑
+    if (linePickMode) return;
+
+    // 防止因为 input blur 触发 focusout -> clearFocusedNodeIf（导致焦点先被清空，历史也变脏）
+    suppressCardFocusOutClear = true;
+    try {
+        const ae = document.activeElement;
+        if (ae && ae.blur) ae.blur();
+    } catch {}
+    suppressCardFocusOutClear = false;
+
+    const idx = pickPointIndexFromEvent(ev);
+    if (idx !== null) {
+        const ownerId = ownerIdForPointIndex(idx);
+        if (ownerId) {
+            focusCardById(ownerId, true, true);
+            return;
+        }
+    }
+
+    // 点到空白处：清空焦点
+    if (focusedNodeId) setFocusedNode(null, true);
+}
 
     function animate() {
         requestAnimationFrame(animate);
@@ -1121,7 +1669,7 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         statusLinePick.classList.add("hidden");
     }
 
-    function startLinePick(targetList, label) {
+    function startLinePick(targetList, label, insertIndex = null) {
         _rClickT = 0;
         clearPickMarkers();
         ensureHoverMarker();
@@ -1129,6 +1677,9 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         hoverMarker.visible = true;
         linePickTargetList = targetList || state.root.children;
         linePickTargetLabel = label || "主Builder";
+        linePickInsertIndex = (insertIndex === undefined ? null : insertIndex);
+        // 记录进入拾取前的聚焦卡片：拾取新增完成后要把聚焦留在原卡片上
+        linePickKeepFocusId = focusedNodeId;
         linePickMode = true;
         picked = [];
         setLinePickStatus(`XZ 拾取模式[${linePickTargetLabel}]：请点第 1 点`);
@@ -1140,6 +1691,8 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         hideHoverMarker();
         linePickMode = false;
         picked = [];
+        linePickInsertIndex = null;
+        linePickKeepFocusId = null;
         hideLinePickStatus();
     }
 
@@ -1200,15 +1753,7 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
     }
 
     function onPointerDown(ev) {
-        // 点击预览区域：视为左侧卡片失焦（否则 input 可能不会 blur，导致高亮残留）
-        if (focusedNodeId) {
-            try {
-                const ae = document.activeElement;
-                if (ae && elCardsRoot.contains(ae) && ae.blur) ae.blur();
-            } catch {}
-            setFocusedNode(null);
-        }
-
+        // 非拾取模式：点击/拖动预览主要用于 OrbitControls；选点聚焦由 click 事件处理
         if (!linePickMode) return;
 
         // ✅ 右键 / Ctrl+Click：不选点，只进入“可能的右键双击取消”判定流程
@@ -1222,6 +1767,9 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
 
         // ✅ 只允许纯左键选点（排除 ctrlKey）
         if (ev.button !== 0 || ev.ctrlKey) return;
+
+        // ✅ 屏蔽随后到来的 click（否则可能清空焦点/误聚焦）
+        suppressNextCanvasClick = true;
 
         const rect = renderer.domElement.getBoundingClientRect();
         mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
@@ -1243,17 +1791,45 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
             } else if (picked.length === 2) {
                 const a = picked[0], b = picked[1];
                 const list = linePickTargetList || state.root.children;
-                list.push(makeNode("add_line", {
+                // ✅ 允许撤销：把“新增直线”纳入历史栈
+                historyCapture("pick_line_xz");
+
+                const nn = makeNode("add_line", {
                     params: {sx: a.x, sy: 0, sz: a.z, ex: b.x, ey: 0, ez: b.z, count: 30}
-                }));
+                });
+
+                // ✅ 支持插入位置：如果是从 withBuilder 或某张卡片后进入拾取，则按 insertIndex 插入并可连续插入
+                if (linePickInsertIndex === null || linePickInsertIndex === undefined) {
+                    list.push(nn);
+                } else {
+                    const at = Math.max(0, Math.min(linePickInsertIndex, list.length));
+                    list.splice(at, 0, nn);
+                    linePickInsertIndex = at + 1;
+                }
 
                 setLinePickStatus(`XZ 拾取模式[${linePickTargetLabel}]：已添加 addLine（可在卡片里改 count）`);
                 picked = [];
                 linePickMode = false;
+                // 退出拾取时清掉插入点；聚焦保留由 keepId 处理
+                linePickInsertIndex = null;
                 setTimeout(() => hideLinePickStatus(), 900);
                 hideHoverMarker();
                 clearPickMarkers();
+                const keepId = linePickKeepFocusId;
                 renderAll();
+                // 用户要求：若进入拾取前聚焦在 withBuilder，则拾取新增后仍保持聚焦在原卡片上
+                if (keepId) {
+                    requestAnimationFrame(() => {
+                        suppressFocusHistory = true;
+                        const el = elCardsRoot.querySelector(`.card[data-id="${keepId}"]`);
+                        if (el) {
+                            try { el.focus(); } catch {}
+                            try { el.scrollIntoView({ block: "nearest" }); } catch {}
+                            setFocusedNode(keepId, false);
+                        }
+                    suppressFocusHistory = false;
+                    });
+                }
             }
         }
     }
@@ -1268,6 +1844,7 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         rebuildTimer = requestAnimationFrame(() => {
             const res = evalBuilderWithMeta(state.root.children, U.v(0, 1, 0));
             nodePointSegments = res.segments;
+            pointOwnerByIndex = buildPointOwnerByIndex(res.points.length, res.segments);
             setPoints(res.points);
             // setPoints 内部会根据 focusedNodeId 重新上色
             elKotlinOut.value = emitKotlin();
@@ -1275,9 +1852,13 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
     }
 
     function renderAll() {
-        // 重新渲染卡片会丢失 DOM 焦点，避免残留高亮
-        setFocusedNode(null);
+        // 保持选中卡片：用于高亮 & 插入规则（withBuilder 内新增等）
         renderCards();
+        // 如果选中的卡片已不存在，则清空
+        if (focusedNodeId && !linePickMode) {
+            const ctx = findNodeContextById(focusedNodeId);
+            if (!ctx) focusedNodeId = null;
+        }
         rebuildPreviewAndKotlin();
     }
 
@@ -1306,13 +1887,15 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         i.type = "number";
         i.step = "any";
         i.value = String(value ?? 0);
-        i.addEventListener("input", () => onInput(i.value));
+        armHistoryOnFocus(i, "edit");
+        i.addEventListener("input", () => onInput(num(i.value)));
         return i;
     }
 
     function select(options, value, onChange) {
         const s = document.createElement("select");
         s.className = "input";
+        armHistoryOnFocus(s, "edit");
         for (const [val, name] of options) {
             const o = document.createElement("option");
             o.value = val;
@@ -1330,6 +1913,8 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         const c = document.createElement("input");
         c.type = "checkbox";
         c.checked = !!checked;
+        armHistoryOnFocus(c, "edit");
+        c.addEventListener("pointerdown", () => historyCapture("checkbox"));
         c.addEventListener("change", () => onChange(c.checked));
         wrap.appendChild(c);
         const sp = document.createElement("span");
@@ -1362,48 +1947,96 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         return box;
     }
 
-    function setupDrag(handleEl, cardEl, listRef, getIdx, afterDrop) {
+    let draggingId = null;
+
+    function setupDnD(handleEl, cardEl, node, listRef, getIdx, ownerNode = null) {
         handleEl.setAttribute("draggable", "true");
         handleEl.addEventListener("dragstart", (e) => {
+            draggingId = node?.id || cardEl.dataset.id;
             cardEl.classList.add("dragging");
             e.dataTransfer.effectAllowed = "move";
-            e.dataTransfer.setData("text/plain", JSON.stringify({id: cardEl.dataset.id}));
+            e.dataTransfer.setData("text/plain", draggingId);
         });
-        handleEl.addEventListener("dragend", () => cardEl.classList.remove("dragging"));
+        handleEl.addEventListener("dragend", () => {
+            draggingId = null;
+            cardEl.classList.remove("dragging");
+            cardEl.classList.remove("drag-over");
+        });
 
         cardEl.addEventListener("dragover", (e) => {
             e.preventDefault();
             e.dataTransfer.dropEffect = "move";
-            cardEl.style.outline = "1px dashed rgba(78,161,255,.55)";
+            cardEl.classList.add("drag-over");
         });
-        cardEl.addEventListener("dragleave", () => {
-            cardEl.style.outline = "";
-        });
+        cardEl.addEventListener("dragleave", () => cardEl.classList.remove("drag-over"));
         cardEl.addEventListener("drop", (e) => {
             e.preventDefault();
-            cardEl.style.outline = "";
-            let payload = null;
-            try {
-                payload = JSON.parse(e.dataTransfer.getData("text/plain"));
-            } catch {
-            }
-            if (!payload || !payload.id) return;
+            e.stopPropagation();
+            cardEl.classList.remove("drag-over");
+            const id = e.dataTransfer.getData("text/plain") || draggingId;
+            if (!id) return;
 
-            const fromIdx = listRef.findIndex(n => n.id === payload.id);
-            const toIdx = getIdx();
-            if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return;
+            // drop 在卡片上：插入到该卡片之前（同列表=排序，跨列表=移动）
+            historyCapture("drag_drop");
+            const ok = moveNodeById(id, listRef, getIdx(), ownerNode);
+            if (ok) renderAll();
+        });
+    }
 
-            const [moved] = listRef.splice(fromIdx, 1);
-            const insertAt = fromIdx < toIdx ? (toIdx - 1) : toIdx;
-            listRef.splice(insertAt, 0, moved);
-            afterDrop();
+    function setupListDropZone(containerEl, getListRef, getOwnerNode) {
+        if (!containerEl || containerEl.__pbDropZoneBound) return;
+        containerEl.__pbDropZoneBound = true;
+
+        containerEl.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            containerEl.classList.add("dropzone-active");
+        });
+
+        containerEl.addEventListener("dragleave", () => containerEl.classList.remove("dropzone-active"));
+
+        containerEl.addEventListener("drop", (e) => {
+            e.preventDefault();
+            containerEl.classList.remove("dropzone-active");
+            const id = e.dataTransfer.getData("text/plain") || draggingId;
+            if (!id) return;
+            const listRef = getListRef();
+            const owner = getOwnerNode ? getOwnerNode() : null;
+            if (!Array.isArray(listRef)) return;
+
+            historyCapture("drag_drop_end");
+            const ok = moveNodeById(id, listRef, listRef.length, owner);
+            if (ok) renderAll();
+        });
+    }
+
+    function bindSubDropZone(zoneEl, listRef, ownerNode) {
+        if (!zoneEl) return;
+        zoneEl.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            zoneEl.classList.add("active");
+        });
+        zoneEl.addEventListener("dragleave", () => zoneEl.classList.remove("active"));
+        zoneEl.addEventListener("drop", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            zoneEl.classList.remove("active");
+            const id = e.dataTransfer.getData("text/plain") || draggingId;
+            if (!id) return;
+            historyCapture("drag_into_withBuilder");
+            const ok = moveNodeById(id, listRef, listRef.length, ownerNode);
+            if (ok) renderAll();
         });
     }
 
     // ------- Modal -------
-    let addTargetList = null;
+    let addTarget = { list: null, insertIndex: null, ownerLabel: "主Builder", ownerNodeId: null, keepFocusId: null };
 
     function showModal() {
+        // ✅ 任何时候打开「添加卡片」都必须是可交互的（不能遗留 under）
+        modal.classList.remove("under");
+        modalMask.classList.remove("under");
         modal.classList.remove("hidden");
         modalMask.classList.remove("hidden");
         cardSearch.value = "";
@@ -1414,10 +2047,20 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
     function hideModal() {
         modal.classList.add("hidden");
         modalMask.classList.add("hidden");
+        // 清理 under 状态，避免下次打开还是模糊不可点
+        modal.classList.remove("under");
+        modalMask.classList.remove("under");
     }
 
-    function openModal(targetList) {
-        addTargetList = targetList;
+    function openModal(targetList, insertIndex = null, ownerLabel = "主Builder", ownerNodeId = null) {
+        // ✅ 记录插入目标 + 需要保持的焦点（在子 builder 内新增后，默认保持聚焦在 withBuilder 上）
+        addTarget = {
+            list: targetList || null,
+            insertIndex: insertIndex,
+            ownerLabel,
+            ownerNodeId: ownerNodeId || null,
+            keepFocusId: ownerNodeId || null,
+        };
         showModal();
     }
 
@@ -1443,11 +2086,53 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
             div.appendChild(t);
             div.appendChild(d);
 
+            // 显示该卡片的快捷键（如果有）
+            const hk = hotkeys && hotkeys.kinds ? (hotkeys.kinds[it.kind] || "") : "";
+            if (hk) {
+                const bad = document.createElement("div");
+                bad.className = "hkbad";
+                bad.textContent = hotkeyToHuman(hk);
+                div.appendChild(bad);
+            }
+            // 在“选择添加”里提供快速设置快捷键
+            const setBtn = document.createElement("button");
+            setBtn.className = "sethk";
+            setBtn.textContent = "⌨";
+            setBtn.title = "设置该卡片的快捷键";
+            setBtn.addEventListener("click", (ev) => {
+                ev.stopPropagation();
+                openHotkeysModal();
+                beginHotkeyCapture({type:"kind", id: it.kind, title: it.def.title});
+            });
+            div.appendChild(setBtn);
+
             div.addEventListener("click", () => {
-                if (!addTargetList) addTargetList = state.root.children;
-                addTargetList.push(makeNode(it.kind));
+                const list = addTarget.list || state.root.children;
+                const atRaw = addTarget.insertIndex;
+                historyCapture("add_" + it.kind);
+                const nn = makeNode(it.kind);
+                if (atRaw === null || atRaw === undefined) {
+                    list.push(nn);
+                } else {
+                    const at = Math.max(0, Math.min(atRaw, list.length));
+                    list.splice(at, 0, nn);
+                    // 连续添加时，保持插入点向后移动
+                    addTarget.insertIndex = at + 1;
+                }
+                ensureAxisEverywhere();
+                // ✅ 子 builder 内新增：默认保持聚焦在 withBuilder 上；否则聚焦到新卡片
+                const focusAfter = (addTarget.keepFocusId && findNodeContextById(addTarget.keepFocusId))
+                    ? addTarget.keepFocusId
+                    : nn.id;
+
                 hideModal();
                 renderAll();
+
+                requestAnimationFrame(() => {
+                    suppressFocusHistory = true;
+                    focusCardById(focusAfter, false, true);
+                    suppressFocusHistory = false;
+                });
             });
             cardPicker.appendChild(div);
         }
@@ -1458,19 +2143,390 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
     modalMask.addEventListener("click", hideModal);
     cardSearch.addEventListener("input", () => renderPicker(cardSearch.value));
 
+
+    // -------------------------
+    // Hotkeys modal UI
+    // -------------------------
+    let hotkeyCapture = null; // {type:"action"|"kind", id:"...", title:"..."}
+
+    const HOTKEY_ACTION_DEFS = [
+        {id: "openPicker", title: "打开「添加卡片」", desc: "默认 W"},
+        {id: "pickLineXZ", title: "进入 XZ 拾取直线", desc: "默认 Q"},
+        {id: "deleteFocused", title: "删除当前聚焦卡片", desc: "默认 Backspace"},
+        {id: "undo", title: "撤销", desc: "默认 Ctrl/Cmd + Z"},
+        {id: "redo", title: "恢复", desc: "默认 Ctrl/Cmd + Shift + Z"},
+    ];
+
+
+    // ✅ 解决：从「添加卡片」窗口内打开快捷键设置会遮挡：采用“叠窗 + 底层磨砂”
+// 打开快捷键时：让添加卡片弹窗进入 under（模糊、不可交互）；关闭快捷键时恢复。
+    let _addModalWasOpenWhenHotkeys = false;
+    function openHotkeysModal() {
+        _addModalWasOpenWhenHotkeys = !!(modal && !modal.classList.contains("hidden"));
+        if (_addModalWasOpenWhenHotkeys) {
+            try { modal.classList.add("under"); } catch {}
+            try { modalMask.classList.add("under"); } catch {} // under 会把 mask 隐藏，避免双层遮罩
+        }
+        showHotkeysModal();
+    }
+
+    function showHotkeysModal() {
+        hkModal?.classList.remove("hidden");
+        hkMask?.classList.remove("hidden");
+        hkSearch.value = "";
+        renderHotkeysList();
+        hkSearch.focus();
+    }
+
+    function hideHotkeysModal() {
+        hkModal?.classList.add("hidden");
+        hkMask?.classList.add("hidden");
+        hotkeyCapture = null;
+        if (hkHint) hkHint.textContent = "提示：点击“设置”后按键。Esc 取消，Backspace/Delete 清空。所有配置会保存到浏览器。";
+
+        // ✅ 若打开快捷键时下面还有「添加卡片」窗口，则恢复其可交互状态
+        if (_addModalWasOpenWhenHotkeys) {
+            _addModalWasOpenWhenHotkeys = false;
+            try { modal.classList.remove("under"); } catch {}
+            try { modalMask.classList.remove("under"); } catch {}
+            // 添加卡片窗口仍然打开时，恢复遮罩
+            if (modal && !modal.classList.contains("hidden")) {
+                modalMask.classList.remove("hidden");
+                try { cardSearch && cardSearch.focus(); } catch {}
+            }
+        }
+    }
+
+
+function beginHotkeyCapture(target) {
+        hotkeyCapture = target;
+        if (hkHint) hkHint.textContent = `正在设置：${target.title || target.id}（按下新按键；Esc 取消；Backspace/Delete 清空）`;
+    }
+
+    function setHotkeyFor(target, hk) {
+        if (!target) return;
+        const except = {type: target.type, id: target.id};
+        removeHotkeyConflicts(hk, except);
+        if (target.type === "action") {
+            hotkeys.actions[target.id] = hk || "";
+        } else if (target.type === "kind") {
+            if (!hk) delete hotkeys.kinds[target.id];
+            else hotkeys.kinds[target.id] = hk;
+        }
+        saveHotkeys();
+        renderHotkeysList();
+    }
+
+    function renderHotkeysList() {
+        if (!hkList) return;
+        const f = (hkSearch.value || "").trim().toLowerCase();
+        hkList.innerHTML = "";
+
+        const makeRow = ({title, desc, type, id, hk}) => {
+            const rowEl = document.createElement("div");
+            rowEl.className = "hk-row";
+
+            const name = document.createElement("div");
+            name.className = "hk-name";
+            const t = document.createElement("div");
+            t.className = "t";
+            t.textContent = title;
+            const d = document.createElement("div");
+            d.className = "d";
+            d.textContent = desc || id;
+            name.appendChild(t);
+            name.appendChild(d);
+
+            const key = document.createElement("div");
+            const human = hotkeyToHuman(hk || "");
+            key.className = "hk-key" + (human ? "" : " empty");
+            key.textContent = human || "未设置";
+
+            const btns = document.createElement("div");
+            btns.className = "hk-btns";
+
+            const bSet = document.createElement("button");
+            bSet.className = "btn small primary";
+            bSet.textContent = "设置";
+            bSet.addEventListener("click", () => beginHotkeyCapture({type, id, title}));
+
+            const bClr = document.createElement("button");
+            bClr.className = "btn small";
+            bClr.textContent = "清空";
+            bClr.addEventListener("click", () => setHotkeyFor({type, id, title}, ""));
+
+            btns.appendChild(bSet);
+            btns.appendChild(bClr);
+
+            rowEl.appendChild(name);
+            rowEl.appendChild(key);
+            rowEl.appendChild(btns);
+            return rowEl;
+        };
+
+        const section = (title) => {
+            const s = document.createElement("div");
+            s.className = "hk-section";
+            const h = document.createElement("div");
+            h.className = "hk-section-title";
+            h.textContent = title;
+            s.appendChild(h);
+            return s;
+        };
+
+        // Actions
+        const s1 = section("动作");
+        for (const a of HOTKEY_ACTION_DEFS) {
+            const hk = (hotkeys.actions || {})[a.id] || "";
+            const text = (a.title + " " + a.desc + " " + hotkeyToHuman(hk)).toLowerCase();
+            if (f && !text.includes(f)) continue;
+            s1.appendChild(makeRow({title: a.title, desc: a.desc, type: "action", id: a.id, hk}));
+        }
+        hkList.appendChild(s1);
+
+        // Card kinds
+        const s2 = section("卡片类型（新增）");
+        const entries = Object.entries(KIND).map(([kind, def]) => ({kind, def}))
+            .filter(it => it.kind !== "ROOT");
+        entries.sort((a, b) => (a.def?.title || a.kind).localeCompare(b.def?.title || b.kind, "zh-CN"));
+
+        for (const it of entries) {
+            const hk = (hotkeys.kinds || {})[it.kind] || "";
+            const title = it.def?.title || it.kind;
+            const desc = it.def?.desc || it.kind;
+            const text = (it.kind + " " + title + " " + desc + " " + hotkeyToHuman(hk)).toLowerCase();
+            if (f && !text.includes(f)) continue;
+            s2.appendChild(makeRow({title, desc, type: "kind", id: it.kind, hk}));
+        }
+        hkList.appendChild(s2);
+    }
+
+    function refreshHotkeyHints() {
+        // 不改变按钮原始文案，只更新 title 提示
+        if (btnAddCard) btnAddCard.title = `快捷键：${hotkeyToHuman(hotkeys.actions.openPicker || "") || "未设置"}`;
+        if (btnPickLine) btnPickLine.title = `快捷键：${hotkeyToHuman(hotkeys.actions.pickLineXZ || "") || "未设置"}`;
+        if (btnHotkeys) btnHotkeys.title = "打开快捷键设置";
+    }
+
+    // Hotkeys modal events
+    btnHotkeys && btnHotkeys.addEventListener("click", openHotkeysModal);
+    btnCloseHotkeys && btnCloseHotkeys.addEventListener("click", hideHotkeysModal);
+    btnCloseHotkeys2 && btnCloseHotkeys2.addEventListener("click", hideHotkeysModal);
+    hkMask && hkMask.addEventListener("click", hideHotkeysModal);
+    hkSearch && hkSearch.addEventListener("input", renderHotkeysList);
+
+    btnHotkeysReset && btnHotkeysReset.addEventListener("click", () => {
+        if (!confirm("确定恢复默认快捷键？")) return;
+        resetHotkeys();
+    });
+
+    btnHotkeysExport && btnHotkeysExport.addEventListener("click", () => {
+        downloadText("hotkeys.json", JSON.stringify(hotkeys, null, 2), "application/json");
+    });
+
+    btnHotkeysImport && btnHotkeysImport.addEventListener("click", () => fileHotkeys && fileHotkeys.click());
+    fileHotkeys && fileHotkeys.addEventListener("change", async () => {
+        const f = fileHotkeys.files && fileHotkeys.files[0];
+        if (!f) return;
+        try {
+            const text = await f.text();
+            const obj = JSON.parse(text);
+            if (!obj || typeof obj !== "object") throw new Error("invalid json");
+            if (!obj.actions || typeof obj.actions !== "object") obj.actions = {};
+            if (!obj.kinds || typeof obj.kinds !== "object") obj.kinds = {};
+            hotkeys = {
+                version: 1,
+                actions: Object.assign({}, DEFAULT_HOTKEYS.actions, obj.actions),
+                kinds: Object.assign({}, obj.kinds),
+            };
+            saveHotkeys();
+            renderHotkeysList();
+        } catch (e) {
+            alert("导入失败：" + e.message);
+        } finally {
+            fileHotkeys.value = "";
+        }
+    });
+
+
+    // -------------------------
+    // Insert context (based on selected / focused card)
+    // -------------------------
+    function getInsertContextFromFocus() {
+        if (focusedNodeId) {
+            const ctx = findNodeContextById(focusedNodeId);
+            if (ctx && ctx.node) {
+                if (ctx.node.kind === "with_builder") {
+                    if (!Array.isArray(ctx.node.children)) ctx.node.children = [];
+                    return { list: ctx.node.children, insertIndex: ctx.node.children.length, label: "子Builder", ownerNode: ctx.node };
+                }
+                // 普通卡片：插到它后面（同一列表）
+                const label = ctx.parentNode ? "子Builder" : "主Builder";
+                return { list: ctx.parentList, insertIndex: ctx.index + 1, label, ownerNode: ctx.parentNode || null };
+            }
+        }
+        return { list: state.root.children, insertIndex: state.root.children.length, label: "主Builder", ownerNode: null };
+    }
+
+    function addKindInContext(kind, ctx) {
+        const list = ctx?.list || state.root.children;
+        const at = (ctx && ctx.insertIndex != null) ? ctx.insertIndex : list.length;
+        historyCapture("hotkey_add_" + kind);
+        const nn = makeNode(kind);
+        const idx = Math.max(0, Math.min(at, list.length));
+        list.splice(idx, 0, nn);
+        ensureAxisEverywhere();
+        renderAll();
+
+        // ✅ 若是在 withBuilder 内新增，则保持聚焦在 withBuilder；否则聚焦新卡片
+        const focusAfter = (ctx && ctx.ownerNode && ctx.ownerNode.kind === "with_builder") ? ctx.ownerNode.id : nn.id;
+        requestAnimationFrame(() => {
+            suppressFocusHistory = true;
+            focusCardById(focusAfter, false, true);
+            suppressFocusHistory = false;
+        });
+    }
+
+    // -------------------------
+    // Global keyboard shortcuts
+    // -------------------------
+    window.addEventListener("keydown", (e) => {
+        // 1) Hotkey capture mode (for settings)
+        if (!hkModal?.classList.contains("hidden") && hotkeyCapture) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (e.code === "Escape") {
+                hotkeyCapture = null;
+                if (hkHint) hkHint.textContent = "已取消。";
+                renderHotkeysList();
+                return;
+            }
+            if (e.code === "Backspace" || e.code === "Delete") {
+                setHotkeyFor(hotkeyCapture, "");
+                hotkeyCapture = null;
+                if (hkHint) hkHint.textContent = "已清空。";
+                return;
+            }
+
+            const hk = eventToHotkey(e);
+            // 必须包含一个“非修饰键”
+            if (!hk || hk === "Mod" || hk === "Shift" || hk === "Alt" || hk === "Mod+Shift" || hk === "Mod+Alt" || hk === "Shift+Alt" || hk === "Mod+Shift+Alt") {
+                return;
+            }
+            setHotkeyFor(hotkeyCapture, hk);
+            hotkeyCapture = null;
+            if (hkHint) hkHint.textContent = "已保存。";
+            return;
+        }
+
+        // 2) Undo/Redo should work everywhere (including inputs)
+        if (hotkeyMatchEvent(e, hotkeys.actions.undo)) {
+            e.preventDefault();
+            historyUndo();
+            return;
+        }
+        if (hotkeyMatchEvent(e, hotkeys.actions.redo)) {
+            e.preventDefault();
+            historyRedo();
+            return;
+        }
+
+        // ignore plain single-key hotkeys when typing
+        const isPlainKey = !(e.ctrlKey || e.metaKey || e.altKey);
+        if (isPlainKey && shouldIgnorePlainHotkeys()) return;
+
+        // when Add-Card modal is open, avoid triggering kind hotkeys while typing search
+        if (!modal.classList.contains("hidden") && document.activeElement === cardSearch && isPlainKey) {
+            // allow Esc handled elsewhere
+            return;
+        }
+
+        // 2.5) Delete focused card (plain key)
+        // 为了避免“在弹窗里误删卡片”，当任意弹窗打开时不响应删除快捷键
+        if ((modal && !modal.classList.contains("hidden")) || (hkModal && !hkModal.classList.contains("hidden"))) {
+            // 仍然允许 undo/redo 在上面已经处理
+        } else {
+            const ae = document.activeElement;
+            const tag = (ae && ae.tagName ? String(ae.tagName).toUpperCase() : "");
+            const isTypingField = !!(ae && (tag === "INPUT" || tag === "TEXTAREA" || ae.isContentEditable));
+            // 删除快捷键不应该在编辑输入时触发（尤其是 number 输入里的 Backspace）
+            if (!isTypingField) {
+                const delHk = hotkeys.actions.deleteFocused || "";
+                const delMatch = hotkeyMatchEvent(e, delHk)
+                    // 兼容：用户默认是 Backspace，但很多键盘会按 Delete
+                    || (normalizeHotkey(delHk) === "Backspace" && (e.code === "Delete" || e.code === "Backspace") && !(e.ctrlKey || e.metaKey || e.altKey || e.shiftKey));
+                if (delMatch) {
+                    e.preventDefault();
+                    deleteFocusedCard();
+                    return;
+                }
+            }
+        }
+
+        // 3) Open picker
+        if (hotkeyMatchEvent(e, hotkeys.actions.openPicker)) {
+            e.preventDefault();
+            // 若快捷键弹窗打开，优先关闭（避免叠窗状态残留）
+            if (hkModal && !hkModal.classList.contains("hidden")) {
+                hideHotkeysModal();
+            }
+            const ctx = getInsertContextFromFocus();
+            const ownerNodeId = (ctx && ctx.ownerNode && ctx.ownerNode.kind === "with_builder") ? ctx.ownerNode.id : null;
+            openModal(ctx.list, ctx.insertIndex, ctx.label, ownerNodeId);
+            return;
+        }
+
+        // 4) Pick line XZ
+        if (hotkeyMatchEvent(e, hotkeys.actions.pickLineXZ)) {
+            e.preventDefault();
+            // 进入拾取模式前，关闭弹窗，避免鼠标事件被遮罩拦截
+            if (modal && !modal.classList.contains("hidden")) hideModal();
+            if (hkModal && !hkModal.classList.contains("hidden")) hideHotkeysModal();
+
+            if (linePickMode) stopLinePick();
+            else {
+                const ctx = getInsertContextFromFocus();
+                startLinePick(ctx.list, ctx.label, ctx.insertIndex);
+            }
+            return;
+        }
+
+        // 5) Add specific kind
+        for (const [kind, hk] of Object.entries(hotkeys.kinds || {})) {
+            if (!hk) continue;
+            if (hotkeyMatchEvent(e, hk)) {
+                e.preventDefault();
+                const ctx = getInsertContextFromFocus();
+                addKindInContext(kind, ctx);
+                return;
+            }
+        }
+    }, true);
+
     // -------------------------
     // Cards render
     // -------------------------
     function renderCards() {
-        elCardsRoot.innerHTML = "";
-        const list = state.root.children;
-        for (let i = 0; i < list.length; i++) {
-            elCardsRoot.appendChild(renderNodeCard(list[i], list, i, "主Builder"));
+        isRenderingCards = true;
+        try {
+            elCardsRoot.innerHTML = "";
+            const list = state.root.children;
+            for (let i = 0; i < list.length; i++) {
+                elCardsRoot.appendChild(renderNodeCard(list[i], list, i, "主Builder", null));
+            }
+        } finally {
+            isRenderingCards = false;
         }
+        // DOM 重建后重新标记聚焦高亮
+        updateFocusCardUI();
     }
 
-    function addQuickOffsetTo(list) {
-        (list || state.root.children).push(makeNode("points_on_each_offset", {params: {offX: 0.2, offY: 0, offZ: 0}}));
+
+function addQuickOffsetTo(list) {
+        const target = (list || state.root.children);
+        historyCapture("quick_offset");
+        target.push(makeNode("points_on_each_offset", {params: {offX: 0.2, offY: 0, offZ: 0}}));
         renderAll();
     }
 
@@ -1903,7 +2959,7 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
                     const addBtn = document.createElement("button");
                     addBtn.className = "btn small primary";
                     addBtn.textContent = "添加卡片";
-                    addBtn.addEventListener("click", () => openModal(node.children));
+                    addBtn.addEventListener("click", () => openModal(node.children, (node.children || []).length, "子Builder", node.id));
 
                     const offBtn = document.createElement("button");
                     offBtn.className = "btn small";
@@ -1913,14 +2969,15 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
                     const pickBtn = document.createElement("button");
                     pickBtn.className = "btn small";
                     pickBtn.textContent = "XZ拾取直线";
-                    pickBtn.addEventListener("click", () => startLinePick(node.children, "子Builder"));
+                    pickBtn.addEventListener("click", () => startLinePick(node.children, "子Builder", (node.children || []).length));
 
                     const clearBtn = document.createElement("button");
                     clearBtn.className = "btn small danger";
                     clearBtn.textContent = "清空";
                     clearBtn.addEventListener("click", () => {
+                        historyCapture("clear_withBuilder");
                         node.children.splice(0);
-                        node.children.push(makeNode("axis"));
+                        ensureAxisInList(node.children);
                         renderAll();
                     });
 
@@ -1934,15 +2991,29 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
 
                     const sub = document.createElement("div");
                     sub.className = "subcards";
+                    setupListDropZone(sub, () => node.children, () => node);
 
                     const list = node.children || [];
                     for (let i = 0; i < list.length; i++) {
-                        sub.appendChild(renderNodeCard(list[i], list, i, "子Builder"));
+                        sub.appendChild(renderNodeCard(list[i], list, i, "子Builder", node));
                     }
 
                     block.appendChild(head);
                     block.appendChild(sub);
+
+                    const zone = document.createElement("div");
+                    zone.className = "dropzone";
+                    zone.textContent = "拖拽卡片到这里：放入该 withBuilder 的子卡片（也可拖到主列表把子卡片拖出来）";
+                    bindSubDropZone(zone, node.children, node);
+                    block.appendChild(zone);
+
                     body.appendChild(block);
+                } else {
+                    const zone = document.createElement("div");
+                    zone.className = "dropzone";
+                    zone.textContent = "拖拽卡片到这里：放入该 withBuilder 的子卡片（折叠状态）";
+                    bindSubDropZone(zone, node.children, node);
+                    body.appendChild(zone);
                 }
                 break;
 
@@ -1977,6 +3048,7 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
                     addBtn.className = "btn small primary";
                     addBtn.textContent = "添加 Fourier 项";
                     addBtn.addEventListener("click", () => {
+                        historyCapture("add_fourier_term");
                         node.terms.push({id: uid(), r: 1, w: 1, startAngle: 0});
                         renderAll();
                     });
@@ -1985,6 +3057,7 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
                     clearBtn.className = "btn small danger";
                     clearBtn.textContent = "清空";
                     clearBtn.addEventListener("click", () => {
+                        historyCapture("clear_fourier_terms");
                         node.terms.splice(0);
                         renderAll();
                     });
@@ -2019,6 +3092,7 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         const card = document.createElement("div");
         card.className = "card";
         card.dataset.id = t.id;
+        if (t.id === focusedNodeId) card.classList.add("focused");
 
         const head = document.createElement("div");
         head.className = "card-head";
@@ -2044,8 +3118,11 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
 
         const actions = document.createElement("div");
         actions.className = "card-actions";
+
         actions.appendChild(iconBtn("↑", () => {
             if (idx > 0) {
+                historyCapture("move_fourier_term_up");
+                historyCapture("move_up");
                 const tmp = parentNode.terms[idx - 1];
                 parentNode.terms[idx - 1] = parentNode.terms[idx];
                 parentNode.terms[idx] = tmp;
@@ -2054,6 +3131,7 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         }));
         actions.appendChild(iconBtn("↓", () => {
             if (idx < parentNode.terms.length - 1) {
+                historyCapture("move_fourier_term_down");
                 const tmp = parentNode.terms[idx + 1];
                 parentNode.terms[idx + 1] = parentNode.terms[idx];
                 parentNode.terms[idx] = tmp;
@@ -2061,7 +3139,13 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
             }
         }));
         actions.appendChild(iconBtn("🗑", () => {
+            historyCapture("delete_fourier_term");
+            const wasFocused = (focusedNodeId === t.id);
             parentNode.terms.splice(idx, 1);
+            if (wasFocused) {
+                const next = pickReasonableFocusAfterDelete({ parentList: parentNode.terms, index: idx, parentNode });
+                setFocusedNode(next, false);
+            }
             renderAll();
         }, true));
 
@@ -2094,6 +3178,7 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         // ✅ 同样处理焦点：避免焦点落在 Fourier 子卡片时仍残留上一张卡的高亮
         card.tabIndex = 0;
         card.addEventListener("pointerdown", (e) => {
+            if (isRenderingCards) return;
             if (e.button !== 0) return;
             // ✅ 避免父卡片接管子卡片的点击：只响应“事件发生在当前卡片自身区域”
             const inner = e.target && e.target.closest ? e.target.closest(".card") : null;
@@ -2101,12 +3186,15 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
             setFocusedNode(t.id);
         });
         card.addEventListener("focusin", (e) => {
+            if (isRenderingCards) return;
             // ✅ focusin 会冒泡：子卡片获得焦点时，父卡片不应抢走高亮
             const inner = e.target && e.target.closest ? e.target.closest(".card") : null;
             if (inner && inner !== card) return;
             setFocusedNode(t.id);
         });
         card.addEventListener("focusout", (e) => {
+            if (isRenderingCards) return;
+            if (suppressCardFocusOutClear) return;
             const next = e.relatedTarget;
             if (next && card.contains(next)) return;
             requestAnimationFrame(() => {
@@ -2120,11 +3208,13 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         return card;
     }
 
-    function renderNodeCard(node, siblings, idx, ownerLabel) {
+    function renderNodeCard(node, siblings, idx, ownerLabel, ownerNode = null) {
         const def = KIND[node.kind];
         const card = document.createElement("div");
         card.className = "card";
         card.dataset.id = node.id;
+        if (node.id === focusedNodeId) card.classList.add("focused");
+        if (node.id === focusedNodeId) card.classList.add("focused");
 
         const head = document.createElement("div");
         head.className = "card-head";
@@ -2150,6 +3240,16 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
 
         const actions = document.createElement("div");
         actions.className = "card-actions";
+
+
+        // ✅ 快捷添加：在当前卡片下方插入（若选中 withBuilder 卡片则插入到子Builder）
+        actions.appendChild(iconBtn("＋", () => {
+            if (node.kind === "with_builder") {
+                openModal(node.children, (node.children || []).length, "子Builder", node.id);
+            } else {
+                openModal(siblings, idx + 1, ownerLabel);
+            }
+        }));
         actions.appendChild(iconBtn("↑", () => {
             if (idx > 0) {
                 const t = siblings[idx - 1];
@@ -2160,6 +3260,7 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         }));
         actions.appendChild(iconBtn("↓", () => {
             if (idx < siblings.length - 1) {
+                historyCapture("move_down");
                 const t = siblings[idx + 1];
                 siblings[idx + 1] = siblings[idx];
                 siblings[idx] = t;
@@ -2168,6 +3269,7 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         }));
         // ✅ 复制卡片：在当前卡片下方插入一张一模一样的（含子卡片/terms）
         actions.appendChild(iconBtn("⧉", () => {
+            historyCapture("copy_card");
             const cloned = cloneNodeDeep(node);
             siblings.splice(idx + 1, 0, cloned);
             renderAll();
@@ -2182,7 +3284,14 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
             });
         }));
         actions.appendChild(iconBtn("🗑", () => {
+            historyCapture("delete_card");
             siblings.splice(idx, 1);
+            // 如果删的是当前聚焦卡片：把焦点挪到更合理的位置（不额外写历史）
+            if (focusedNodeId === node.id) {
+                const next = pickReasonableFocusAfterDelete({ parentList: siblings, index: idx, parentNode: ownerNode });
+                setFocusedNode(next, false);
+            }
+            ensureAxisEverywhere();
             renderAll();
         }, true));
 
@@ -2220,6 +3329,8 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
             setFocusedNode(node.id);
         });
         card.addEventListener("focusout", (e) => {
+            if (isRenderingCards) return;
+            if (suppressCardFocusOutClear) return;
             const next = e.relatedTarget;
             if (next && card.contains(next)) return;
             // 延迟一帧：避免同卡片内切换焦点时误清空
@@ -2230,7 +3341,7 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
             });
         });
 
-        setupDrag(handle, card, siblings, () => idx, () => renderAll());
+        setupDnD(handle, card, node, siblings, () => idx, ownerNode);
         return card;
     }
 
@@ -2263,12 +3374,22 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
     btnDownloadKotlin && btnDownloadKotlin.addEventListener("click", doDownloadKotlin);
     btnDownloadKotlin2 && btnDownloadKotlin2.addEventListener("click", doDownloadKotlin);
 
-    btnAddCard.addEventListener("click", () => openModal(state.root.children));
-    btnQuickOffset.addEventListener("click", () => addQuickOffsetTo(state.root.children));
+    btnAddCard.addEventListener("click", () => {
+            const ctx = getInsertContextFromFocus();
+            const ownerNodeId = (ctx && ctx.ownerNode && ctx.ownerNode.kind === "with_builder") ? ctx.ownerNode.id : null;
+            openModal(ctx.list, ctx.insertIndex, ctx.label, ownerNodeId);
+        });
+    btnQuickOffset.addEventListener("click", () => {
+        const ctx = getInsertContextFromFocus();
+        addQuickOffsetTo(ctx.list);
+    });
 
     btnPickLine.addEventListener("click", () => {
         if (linePickMode) stopLinePick();
-        else startLinePick(state.root.children, "主Builder");
+        else {
+            const ctx = getInsertContextFromFocus();
+            startLinePick(ctx.list, ctx.label, ctx.insertIndex);
+        }
     });
 
     btnFullscreen.addEventListener("click", () => {
@@ -2277,13 +3398,25 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         else document.exitFullscreen?.();
     });
 
-    btnSaveJson.addEventListener("click", () => {
-        const blob = new Blob([JSON.stringify(state, null, 2)], {type: "application/json"});
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = "pointsbuilder.json";
-        a.click();
-        URL.revokeObjectURL(a.href);
+    btnSaveJson.addEventListener("click", async () => {
+        const text = JSON.stringify(state, null, 2);
+        // 选择保存位置与名字（若浏览器支持 File System Access API）
+        try {
+            if (window.showSaveFilePicker) {
+                const handle = await window.showSaveFilePicker({
+                    suggestedName: "shape.json",
+                    types: [{ description: "JSON", accept: {"application/json": [".json"]} }]
+                });
+                const writable = await handle.createWritable();
+                await writable.write(text);
+                await writable.close();
+                return;
+            }
+        } catch (e) {
+            // 用户取消/权限问题：回退到普通下载
+            console.warn("showSaveFilePicker fallback:", e);
+        }
+        downloadText("shape.json", text, "application/json");
     });
 
     btnLoadJson.addEventListener("click", () => fileJson.click());
@@ -2294,7 +3427,9 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         try {
             const obj = JSON.parse(text);
             if (!obj || !obj.root || !Array.isArray(obj.root.children)) throw new Error("invalid json");
+            historyCapture("import_json");
             state = obj;
+            ensureAxisEverywhere();
             renderAll();
         } catch (e) {
             alert("JSON 解析失败：" + e.message);
@@ -2305,7 +3440,8 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
 
     btnReset.addEventListener("click", () => {
         if (!confirm("确定重置全部卡片？")) return;
-        state = {root: {id: "root", kind: "ROOT", children: [makeNode("axis", {params: {x: 0, y: 1, z: 0}})]}};
+        historyCapture("reset");
+        state = {root: {id: "root", kind: "ROOT", children: []}};
         renderAll();
     });
 
@@ -2313,5 +3449,7 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
     // Boot
     // -------------------------
     initThree();
+    setupListDropZone(elCardsRoot, () => state.root.children, () => null);
+    refreshHotkeyHints();
     renderAll();
 })();

@@ -1,0 +1,235 @@
+:root{
+  --bg:#05060a;
+  --card:rgba(18,20,28,.78);
+  --card2:rgba(18,20,28,.62);
+  --stroke:rgba(255,255,255,.10);
+  --text:rgba(255,255,255,.92);
+  --muted:rgba(255,255,255,.66);
+  --shadow: 0 12px 40px rgba(0,0,0,.45);
+  --radius:18px;
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  color:var(--text);
+  background:var(--bg);
+  font-family: ui-sans-serif, system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", Segoe UI, Roboto, Helvetica, Arial;
+  overflow:hidden;
+}
+
+#bg{
+  position:fixed;
+  inset:0;
+  width:100%;
+  height:100%;
+  z-index:0;
+}
+
+.shell{
+  position:relative;
+  z-index:2;
+  height:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+}
+
+.grid{
+  width:min(52vw, 980px);
+  min-width: 720px;
+  display:grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: 170px;
+    grid-template-rows: 170px 170px 340px;
+gap:14px;
+  grid-template-areas:
+    "profile profile generator generator"
+    "profile profile beizer pointsbuilder"
+    "codeflow codeflow codeflow codeflow";
+}
+
+@media (max-width: 980px){
+  .grid{
+    width:min(92vw, 980px);
+    min-width:0;
+    grid-template-columns: 1fr 1fr;
+    grid-auto-rows:  170px;    grid-template-rows: 170px 170px 170px 340px;
+    grid-template-areas:
+      "profile profile"
+      "generator generator"
+      "beizer pointsbuilder"
+      "codeflow codeflow";
+  }
+}
+
+.card{
+  background:linear-gradient(180deg, var(--card), var(--card2));
+  border:1px solid var(--stroke);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:14px 16px;
+  backdrop-filter: blur(10px);
+  overflow:hidden;
+}
+
+.card h3{
+  margin:0 0 6px 0;
+  font-size:16px;
+  letter-spacing:.2px;
+}
+.card p{
+  margin:0 0 10px 0;
+  color:var(--muted);
+  font-size:13px;
+  line-height:1.45;
+}
+
+.card-link{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  height:32px;
+  padding:0 12px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.16);
+  background:rgba(255,255,255,.06);
+  color:var(--text);
+  text-decoration:none;
+  font-size:13px;
+  transition: transform .12s ease, background .12s ease, border-color .12s ease;
+}
+.card-link:hover{
+  background:rgba(255,255,255,.10);
+  border-color:rgba(255,255,255,.22);
+  transform: translateY(-1px);
+}
+.card-link:active{ transform: translateY(0px) scale(.98); }
+
+.card-profile{ grid-area: profile; }
+.card-generator{ grid-area: generator; }
+.card-beizer{ grid-area: beizer; }
+.card-points{ grid-area: pointsbuilder; }
+.card-codeflow{ grid-area: codeflow; padding:12px 12px; }
+
+.profile-top{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+
+.profile-text .hello{
+  font-size:18px;
+  font-weight:700;
+  line-height:1.2;
+  margin-top:2px;
+}
+.profile-text .name{
+  font-size:22px;
+  font-weight:800;
+  margin-top:8px;
+}
+
+.profile-avatar{
+  width:72px;
+  height:72px;
+  border-radius:14px;
+  overflow:hidden;
+  flex:0 0 auto;
+  border:1px solid rgba(255,255,255,.12);
+  box-shadow: 0 10px 30px rgba(0,0,0,.35);
+}
+.profile-avatar img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+
+.profile-stats{
+  margin-top:12px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.stat-row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-size:14px;
+}
+.stat-row .label{ color: var(--muted); }
+
+.odometer{
+  display:inline-flex;
+  gap:2px;
+  font-variant-numeric: tabular-nums;
+  font-weight:800;
+  font-size:16px;
+  letter-spacing:.3px;
+  min-height:20px;
+}
+
+.odo-digit{
+  position:relative;
+  width:12px;
+  height:18px;
+  overflow:hidden;
+  display:inline-block;
+}
+
+.odo-wheel{
+  position:absolute;
+  left:0;
+  top:0;
+  display:flex;
+  flex-direction:column;
+  transform: translateY(0px);
+  transition: transform .55s cubic-bezier(.2,.9,.2,1);
+}
+
+.odo-num{
+  height:18px;
+  line-height:18px;
+  text-align:center;
+  width:12px;
+}
+
+.odo-digit.spin .odo-wheel{
+  /* 默认滚到最后一行（目标） */
+  transform: translateY(calc(-18px * 10));
+}
+
+/* codeflow */
+.card-codeflow h3{ margin-bottom:10px; }
+.code-box{
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:14px;
+  background: rgba(0,0,0,.25);
+  height: 260px;
+  overflow:auto;
+  padding:12px;
+}
+.code-pre{
+  margin:0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size:12.5px;
+  line-height:1.55;
+  color:rgba(255,255,255,.88);
+  white-space:pre;
+}
+.code-cursor{
+  display:inline-block;
+  width:8px;
+  margin-left:2px;
+  background:rgba(255,255,255,.75);
+  animation: blink 1s steps(1,end) infinite;
+}
+@keyframes blink { 50% { opacity:0; } }
+
+
+.card.codeflow{ min-height: 340px; }
+@media (max-width:980px){ .card.codeflow{ min-height: 340px; } }

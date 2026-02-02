@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>PointsBuilder 可视化构建器</title>
-    <link rel="stylesheet" href="./css/PointsBuilder/style.css" />
+    <link rel="stylesheet" href="./assets/points_builder/css/style.css" />
 </head>
 <body>
 <div id="app">
@@ -20,6 +20,7 @@
             <button id="btnAddCard" class="btn primary">添加卡片</button>
             <button id="btnQuickOffset" class="btn">快捷 Offset</button>
             <button id="btnPickLine" class="btn">XZ 拾取直线</button>
+            <button id="btnHotkeys" class="btn">快捷键</button>
             <button id="btnFullscreen" class="btn">预览全屏</button>
 
             <span class="sep"></span>
@@ -89,7 +90,7 @@
 
         <aside class="panel right">
             <div class="panel-title">Kotlin 代码</div>
-            <textarea id="kotlinOut" class="code" spellcheck="false"></textarea>
+            <textarea id="kotlinOut" class="code" spellcheck="false" readonly></textarea>
 
             <div class="panel-actions">
                 <button id="btnCopyKotlin2" class="btn">复制</button>
@@ -117,6 +118,29 @@
             <button id="btnCancelModal" class="btn">取消</button>
         </div>
     </div>
+
+    <!-- 快捷键设置 -->
+    <div id="hkMask" class="modal-mask hidden"></div>
+    <div id="hkModal" class="modal hidden" role="dialog" aria-modal="true">
+        <div class="modal-head">
+            <div class="modal-title">快捷键设置</div>
+            <input id="hkSearch" class="input" placeholder="搜索：撤销 / 添加卡片 / addCircle ..." />
+            <button id="btnCloseHotkeys" class="btn icon">✕</button>
+        </div>
+        <div class="modal-body">
+            <div id="hkHint" style="margin:0 0 10px; opacity:.8; font-size:12px;">点击「设置」后按下你想要的按键（Esc 取消，Backspace 清空）。</div>
+            <div id="hkList" class="hk-list"></div>
+        </div>
+        <div class="modal-foot" style="display:flex; gap:8px; align-items:center;">
+            <button id="btnHotkeysReset" class="btn">恢复默认</button>
+            <button id="btnHotkeysExport" class="btn">导出按键</button>
+            <button id="btnHotkeysImport" class="btn">导入按键</button>
+            <input id="fileHotkeys" type="file" accept="application/json" hidden />
+            <span style="flex:1 1 auto;"></span>
+            <button id="btnCloseHotkeys2" class="btn primary">关闭</button>
+        </div>
+    </div>
+
 </div>
 
 <!-- 固定到 r149：避免 r150+ 的 deprecated 提示，同时保持纯 script 引入可 file:// 直接运行 -->
@@ -128,7 +152,7 @@
       }
     }
 </script>
-<script src="./js/PointsBuilder/utils.js"></script>
-<script type="module" src="./js/PointsBuilder/main.js"></script>
+<script src="./assets/points_builder/js/utils.js"></script>
+<script type="module" src="./assets/points_builder/js/main.js"></script>
 </body>
 </html>

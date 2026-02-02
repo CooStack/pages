@@ -1,143 +1,70 @@
 <!doctype html>
 <html lang="zh-CN">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CooStack</title>
-    <style>
-      :root {
-        --bg-color: #f8f9fa;
-        --card-bg: #ffffff;
-        --text-main: #2d3436;
-        --text-sub: #636e72;
-        --accent: #0984e3;
-        --border: #edf2f7;
-      }
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>个人主页 · 粒子导航</title>
+  <link rel="stylesheet" href="./assets/blog/css/styles.css?v=8" />
+</head>
+<body>
+  <canvas id="bg"></canvas>
 
-      * {
-        box-sizing: border-box;
-      }
+  <main class="shell">
+    <section class="grid">
+      <!-- 个人信息 -->
+      <article class="card card-profile" id="profileCard">
+        <div class="profile-top">
+          <div class="profile-text">
+            <div class="hello">你好！</div>
+            <div class="name">我是空栈!</div>
+          </div>
 
-      body {
-        margin: 0;
-        padding: 0;
-        background-color: var(--bg-color);
-        color: var(--text-main);
-        font-family:
-          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        min-height: 100vh;
-      }
+          <div class="profile-avatar">
+            <img id="avatar" alt="头像" />
+          </div>
+        </div>
 
-      .wrapper {
-        width: 90%;
-        max-width: 800px;
-        padding: 40px 0;
-      }
+        <div class="profile-stats">
+          <div class="stat-row">
+            <span class="label">粉丝数:</span>
+            <span class="odometer" data-stat="fans" aria-label="粉丝数"></span>
+          </div>
+        </div>
+      </article>
 
-      header {
-        margin-bottom: 40px;
-        text-align: left;
-      }
+      <!-- 工具卡片 -->
+      <article class="card card-tool card-generator">
+        <h3>粒子发射器指令生成器</h3>
+        <p>直观看到粒子的运动轨迹与方向。</p>
+        <a class="card-link" href="./generator.html">打开</a>
+      </article>
 
-      header h1 {
-        font-size: 1.5rem;
-        font-weight: 600;
-        letter-spacing: -0.5px;
-        margin: 0;
-      }
+      <article class="card card-tool card-beizer">
+        <h3>贝塞尔曲线生成器</h3>
+        <p>直观生成对应的 CooParticlesAPI 代码。</p>
+        <a class="card-link" href="./bezier.html">打开</a>
+      </article>
 
-      header p {
-        color: var(--text-sub);
-        font-size: 0.9rem;
-        margin-top: 8px;
-      }
+      <article class="card card-tool card-points">
+        <h3>粒子样式生成器</h3>
+        <p>高效构建一个粒子的图案。</p>
+        <a class="card-link" href="./pointsbuilder.html">打开</a>
+      </article>
 
-      .grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-        gap: 16px;
-      }
+      <!-- 代码流（最下面整行） -->
+      <article class="card card-codeflow" id="codeflowCard">
+        <h3>代码流</h3>
+        <div class="code-box" id="codeBox" aria-label="代码展示区域">
+          <pre class="code-pre"><code id="codeContent"></code></pre>
+        </div>
+      </article>
+    </section>
+  </main>
 
-      .item {
-        background: var(--card-bg);
-        border: 1px solid var(--border);
-        padding: 20px;
-        border-radius: 12px;
-        text-decoration: none;
-        color: inherit;
-        transition: all 0.2s ease;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-      }
-
-      .item:hover {
-        border-color: var(--accent);
-        transform: translateY(-2px);
-        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
-      }
-
-      .item .icon {
-        font-size: 1.2rem;
-        margin-bottom: 12px;
-      }
-
-      .item .title {
-        font-weight: 500;
-        font-size: 0.95rem;
-        margin-bottom: 4px;
-      }
-
-      .item .desc {
-        font-size: 0.75rem;
-        color: var(--text-sub);
-      }
-
-      footer {
-        margin-top: 50px;
-        font-size: 0.8rem;
-        color: #b2bec3;
-        text-align: center;
-      }
-
-      @media (max-width: 480px) {
-        .grid {
-          grid-template-columns: 1fr 1fr;
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <div class="wrapper">
-      <header>
-        <h1>CooStack</h1>
-        <p>个人常用工具与资源导航</p>
-      </header>
-
-      <div class="grid">
-        <a href="./bezier.html" class="item">
-          <div class="icon">🐙</div>
-          <div class="title">贝塞尔曲线生成工具</div>
-          <div class="desc">适用于CooParticlesAPI的贝塞尔曲线生成工具</div>
-        </a>
-
-        <a href="./generator.html" class="item">
-          <div class="icon">💬</div>
-          <div class="title">粒子发射器可视化</div>
-          <div class="desc">用于生成CooParticlesAPI代码</div>
-        </a>
-
-        <a href="./pointsbuilder.html" class="item">
-          <div class="icon">·</div>
-          <div class="title">粒子PointsBuilder构建器</div>
-          <div class="desc">用于生成PointsBuilder代码</div>
-        </a>
-      </div>
-
-      <footer>&copy; 2026 Created by CooStack.</footer>
-    </div>
-  </body>
+  <script src="./assets/blog/js/particles.js?v=8"></script>
+  <script src="./assets/blog/js/fireworks.js?v=8"></script>
+  <script src="./assets/blog/js/codeflow.js?v=8"></script>
+  <script src="./assets/blog/js/stats.js?v=8"></script>
+  <script src="./assets/blog/js/main.js?v=8"></script>
+</body>
 </html>

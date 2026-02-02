@@ -21,6 +21,17 @@ import * as THREE from 'three';
     const kVec3 = (x, y, z) => `Vec3(${fmtD(x)}, ${fmtD(y)}, ${fmtD(z)})`;
     const kSupplierVec3 = (x, y, z) => `Supplier { ${kVec3(x, y, z)} }`;
 
+const kTrailingLambda = (expr, fallback = "this.pos") => {
+    const raw = (expr ?? "").trim();
+    let s = raw.length ? raw : fallback;
+    s = s.trim();
+    if (s.startsWith("{") && s.endsWith("}")) {
+        s = s.substring(1, s.length - 1).trim();
+    }
+    return `{${s}}`;
+};
+
+
     // ---------- command templates ----------
     const COMMAND_META = {
         ParticleNoiseCommand: {
@@ -92,7 +103,7 @@ import * as THREE from 'three';
                 {k: "targetX", t: "number", step: 0.01, def: 0.0},
                 {k: "targetY", t: "number", step: 0.01, def: 0.0},
                 {k: "targetZ", t: "number", step: 0.01, def: 0.0},
-                {k: "targetExpr", t: "text", def: "{ this.pos }"},
+                {k: "targetExpr", t: "text", def: "this.pos"},
 
                 {k: "strength", t: "number", step: 0.01, def: 0.8},
                 {k: "range", t: "number", step: 0.01, def: 8.0},
@@ -101,13 +112,13 @@ import * as THREE from 'three';
             ],
             toKotlin: (c) => {
                 const p = c.params;
-                const target = (p.targetMode === "expr")
-                    ? (p.targetExpr || "{ this.pos }")
-                    : kSupplierVec3(p.targetX, p.targetY, p.targetZ);
+                const targetLine = (p.targetMode === "expr")
+                    ? `.target${kTrailingLambda(p.targetExpr, "this.pos")}`
+                    : `.target(${kSupplierVec3(p.targetX, p.targetY, p.targetZ)})`;
 
                 return chain([
                     `ParticleAttractionCommand()`,
-                    `.target(${target})`,
+                    targetLine,
                     `.strength(${fmtD(p.strength)})`,
                     `.range(${fmtD(p.range)})`,
                     `.falloffPower(${fmtD(p.falloffPower)})`,
@@ -123,7 +134,7 @@ import * as THREE from 'three';
                 {k: "centerX", t: "number", step: 0.01, def: 0.0},
                 {k: "centerY", t: "number", step: 0.01, def: 0.0},
                 {k: "centerZ", t: "number", step: 0.01, def: 0.0},
-                {k: "centerExpr", t: "text", def: "{ this.pos }"},
+                {k: "centerExpr", t: "text", def: "this.pos"},
 
                 {k: "axisX", t: "number", step: 0.01, def: 0.0},
                 {k: "axisY", t: "number", step: 0.01, def: 1.0},
@@ -144,13 +155,13 @@ import * as THREE from 'three';
             ],
             toKotlin: (c) => {
                 const p = c.params;
-                const center = (p.centerMode === "expr")
-                    ? (p.centerExpr || "{ this.pos }")
-                    : kSupplierVec3(p.centerX, p.centerY, p.centerZ);
+                const centerLine = (p.centerMode === "expr")
+                    ? `.center${kTrailingLambda(p.centerExpr, "this.pos")}`
+                    : `.center(${kSupplierVec3(p.centerX, p.centerY, p.centerZ)})`;
 
                 return chain([
                     `ParticleOrbitCommand()`,
-                    `.center(${center})`,
+                    centerLine,
                     `.axis(${kVec3(p.axisX, p.axisY, p.axisZ)})`,
                     `.radius(${fmtD(p.radius)})`,
                     `.angularSpeed(${fmtD(p.angularSpeed)})`,
@@ -169,7 +180,7 @@ import * as THREE from 'three';
                 {k: "centerX", t: "number", step: 0.01, def: 0.0},
                 {k: "centerY", t: "number", step: 0.01, def: 0.0},
                 {k: "centerZ", t: "number", step: 0.01, def: 0.0},
-                {k: "centerExpr", t: "text", def: "{ this.pos }"},
+                {k: "centerExpr", t: "text", def: "this.pos"},
 
                 {k: "axisX", t: "number", step: 0.01, def: 0.0},
                 {k: "axisY", t: "number", step: 0.01, def: 1.0},
@@ -185,13 +196,13 @@ import * as THREE from 'three';
             ],
             toKotlin: (c) => {
                 const p = c.params;
-                const center = (p.centerMode === "expr")
-                    ? (p.centerExpr || "{ this.pos }")
-                    : kSupplierVec3(p.centerX, p.centerY, p.centerZ);
+                const centerLine = (p.centerMode === "expr")
+                    ? `.center${kTrailingLambda(p.centerExpr, "this.pos")}`
+                    : `.center(${kSupplierVec3(p.centerX, p.centerY, p.centerZ)})`;
 
                 return chain([
                     `ParticleVortexCommand()`,
-                    `.center(${center})`,
+                    centerLine,
                     `.axis(${kVec3(p.axisX, p.axisY, p.axisZ)})`,
                     `.swirlStrength(${fmtD(p.swirlStrength)})`,
                     `.radialPull(${fmtD(p.radialPull)})`,
@@ -210,7 +221,7 @@ import * as THREE from 'three';
                 {k: "centerX", t: "number", step: 0.01, def: 0.0},
                 {k: "centerY", t: "number", step: 0.01, def: 0.0},
                 {k: "centerZ", t: "number", step: 0.01, def: 0.0},
-                {k: "centerExpr", t: "text", def: "{ this.pos }"},
+                {k: "centerExpr", t: "text", def: "this.pos"},
 
                 {k: "axisX", t: "number", step: 0.01, def: 0.0},
                 {k: "axisY", t: "number", step: 0.01, def: 1.0},
@@ -222,13 +233,13 @@ import * as THREE from 'three';
             ],
             toKotlin: (c) => {
                 const p = c.params;
-                const center = (p.centerMode === "expr")
-                    ? (p.centerExpr || "{ this.pos }")
-                    : kSupplierVec3(p.centerX, p.centerY, p.centerZ);
+                const centerLine = (p.centerMode === "expr")
+                    ? `.center${kTrailingLambda(p.centerExpr, "this.pos")}`
+                    : `.center(${kSupplierVec3(p.centerX, p.centerY, p.centerZ)})`;
 
                 return chain([
                     `ParticleRotationForceCommand()`,
-                    `.center(${center})`,
+                    centerLine,
                     `.axis(${kVec3(p.axisX, p.axisY, p.axisZ)})`,
                     `.strength(${fmtD(p.strength)})`,
                     `.range(${fmtD(p.range)})`,
@@ -298,6 +309,349 @@ import * as THREE from 'three';
         },
         kotlin: {varName: "command", kRefName: "emitter"}
     };
+
+
+    // ---------- persistence & card undo/redo ----------
+    const STORAGE_KEY = "pe_state_v2";
+    const HISTORY_MAX = 80;
+
+    const deepCopy = (o) => JSON.parse(JSON.stringify(o));
+
+    // 默认状态快照（用于一键恢复）
+    const DEFAULT_BASE_STATE = deepCopy(state);
+    function makeDefaultCommands(){
+        return [newCommand("ParticleNoiseCommand"), newCommand("ParticleDragCommand")];
+    }
+
+    function buildPersistPayload() {
+        // 只保存与编辑器相关的数据（不保存 Three/运行时）
+        return {
+            version: 2,
+            savedAt: new Date().toISOString(),
+            state: {
+                commands: deepCopy(state.commands),
+                ticksPerSecond: state.ticksPerSecond,
+                emitter: deepCopy(state.emitter),
+                particle: deepCopy(state.particle),
+                kotlin: deepCopy(state.kotlin),
+            }
+        };
+    }
+
+    let saveTimer = 0;
+    function saveNow() {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(buildPersistPayload()));
+        } catch (_) {
+            // ignore quota / private mode
+        }
+    }
+
+    function scheduleSave() {
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(saveNow, 200);
+    }
+
+    function deepAssign(dst, src) {
+        if (!src || typeof src !== "object") return;
+        for (const k of Object.keys(src)) {
+            const v = src[k];
+            if (v && typeof v === "object" && !Array.isArray(v)) {
+                if (!dst[k] || typeof dst[k] !== "object") dst[k] = {};
+                deepAssign(dst[k], v);
+            } else {
+                dst[k] = v;
+            }
+        }
+    }
+
+    function normalizeCommand(raw) {
+        if (!raw || typeof raw !== "object") return null;
+        const type = raw.type;
+        if (!type || !COMMAND_META[type]) return null;
+        const base = newCommand(type);
+        if (typeof raw.id === "string" && raw.id.trim().length) base.id = raw.id.trim();
+        if (typeof raw.enabled === "boolean") base.enabled = raw.enabled;
+        if (raw.params && typeof raw.params === "object") deepAssign(base.params, raw.params);
+        return base;
+    }
+
+    function applyLoadedState(s) {
+        if (!s || typeof s !== "object") return false;
+
+        if (typeof s.ticksPerSecond === "number") state.ticksPerSecond = s.ticksPerSecond;
+        if (s.emitter) deepAssign(state.emitter, s.emitter);
+        if (s.particle) deepAssign(state.particle, s.particle);
+        if (s.kotlin) deepAssign(state.kotlin, s.kotlin);
+
+        const cmds = Array.isArray(s.commands) ? s.commands : [];
+        const norm = cmds.map(normalizeCommand).filter(Boolean);
+        state.commands = norm;
+
+        if (!state.commands.length) {
+            state.commands.push(newCommand("ParticleNoiseCommand"));
+            state.commands.push(newCommand("ParticleDragCommand"));
+        }
+        return true;
+    }
+
+    function loadPersisted() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return false;
+            const obj = JSON.parse(raw);
+            if (obj && typeof obj === "object") {
+                if (obj.state) return applyLoadedState(obj.state);
+                return applyLoadedState(obj);
+            }
+        } catch (_) {
+            // ignore
+        }
+        return false;
+    }
+
+    function applyStateToForm() {
+        // 基础
+        $("#emitterType").val(state.emitter.type);
+        setEmitterSection();
+        $("#ticksPerSecond").val(state.ticksPerSecond);
+
+        // 偏移
+        $("#emitOffX").val(state.emitter.offset.x);
+        $("#emitOffY").val(state.emitter.offset.y);
+        $("#emitOffZ").val(state.emitter.offset.z);
+
+        // 粒子
+        $("#lifeMin").val(state.particle.lifeMin);
+        $("#lifeMax").val(state.particle.lifeMax);
+        $("#sizeMin").val(state.particle.sizeMin);
+        $("#sizeMax").val(state.particle.sizeMax);
+        $("#countMin").val(state.particle.countMin);
+        $("#countMax").val(state.particle.countMax);
+        $("#velX").val(state.particle.vel.x);
+        $("#velY").val(state.particle.vel.y);
+        $("#velZ").val(state.particle.vel.z);
+        $("#velSpeed").val(state.particle.velSpeed);
+        $("#visibleRange").val(state.particle.visibleRange);
+        $("#colStart").val(state.particle.colorStart);
+        $("#colEnd").val(state.particle.colorEnd);
+
+        // emitter params
+        $("#boxX").val(state.emitter.box.x);
+        $("#boxY").val(state.emitter.box.y);
+        $("#boxZ").val(state.emitter.box.z);
+        $("#boxDensity").val(state.emitter.box.density);
+        $("#boxSurface").val(state.emitter.box.surface ? "1" : "0");
+
+        $("#sphereR").val(state.emitter.sphere.r);
+        $("#sphereSurfR").val(state.emitter.sphereSurface.r);
+
+        $("#ringR").val(state.emitter.ring.r);
+        $("#ringThickness").val(state.emitter.ring.thickness);
+        $("#ringAx").val(state.emitter.ring.axis.x);
+        $("#ringAy").val(state.emitter.ring.axis.y);
+        $("#ringAz").val(state.emitter.ring.axis.z);
+
+        // kotlin
+        $("#kVarName").val(state.kotlin.varName);
+        $("#kRefName").val(state.kotlin.kRefName);
+    }
+
+    const cardHistory = {
+        undo: [],
+        redo: [],
+        init() {
+            this.undo = [deepCopy(state.commands)];
+            this.redo = [];
+        },
+        push() {
+            const snap = deepCopy(state.commands);
+            const last = this.undo[this.undo.length - 1];
+            if (JSON.stringify(last) === JSON.stringify(snap)) return;
+            this.undo.push(snap);
+            if (this.undo.length > HISTORY_MAX) this.undo.shift();
+            this.redo = [];
+        },
+        undoOnce() {
+            if (this.undo.length <= 1) return false;
+            const cur = this.undo.pop();
+            this.redo.push(cur);
+            state.commands = deepCopy(this.undo[this.undo.length - 1]);
+            renderCommandList();
+            autoGenKotlin();
+            scheduleSave();
+            toast("已撤回");
+            return true;
+        },
+        redoOnce() {
+            if (!this.redo.length) return false;
+            const next = this.redo.pop();
+            this.undo.push(deepCopy(next));
+            state.commands = deepCopy(next);
+            renderCommandList();
+            autoGenKotlin();
+            scheduleSave();
+            toast("已重做");
+            return true;
+        }
+    };
+
+    let histTimer = 0;
+    function scheduleHistoryPush() {
+        clearTimeout(histTimer);
+        histTimer = setTimeout(() => cardHistory.push(), 250);
+    }
+
+    async function exportStateJson() {
+        try {
+            readBaseForm();
+            const payload = buildPersistPayload();
+            const json = JSON.stringify(payload, null, 2);
+            const suggestedName = `particle_emitter_${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+
+            if (window.showSaveFilePicker) {
+                const handle = await window.showSaveFilePicker({
+                    suggestedName,
+                    types: [{
+                        description: "JSON",
+                        accept: {"application/json": [".json"]}
+                    }]
+                });
+                const writable = await handle.createWritable();
+                await writable.write(json);
+                await writable.close();
+                toast("已导出 JSON");
+                return;
+            }
+
+            // fallback：下载
+            const blob = new Blob([json], {type: "application/json"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = suggestedName;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+            toast("已导出 JSON（下载）");
+        } catch (e) {
+            if (e && e.name === "AbortError") return;
+            console.error(e);
+            toast("导出失败");
+        }
+    }
+
+    function importStateFromText(text) {
+        let obj;
+        try {
+            obj = JSON.parse(text);
+        } catch (_) {
+            toast("JSON 格式错误");
+            return;
+        }
+
+        const s = (obj && typeof obj === "object" && obj.state) ? obj.state : obj;
+        const ok = applyLoadedState(s);
+        if (!ok) {
+            toast("JSON 内容不支持");
+            return;
+        }
+
+        applyStateToForm();
+        renderCommandList();
+        autoGenKotlin();
+        cardHistory.init();
+        scheduleSave();
+        toast("已导入 JSON");
+    }
+
+    async function importStateJson() {
+        try {
+            if (window.showOpenFilePicker) {
+                const [handle] = await window.showOpenFilePicker({
+                    multiple: false,
+                    types: [{
+                        description: "JSON",
+                        accept: {"application/json": [".json"]}
+                    }]
+                });
+                const file = await handle.getFile();
+                const text = await file.text();
+                importStateFromText(text);
+                return;
+            }
+
+            // fallback：隐藏 input
+            const $f = $("#importFile");
+            // one-shot change handler
+            $f.off("change._import");
+            $f.on("change._import", async function () {
+                try {
+                    const file = (this.files && this.files[0]) ? this.files[0] : null;
+                    // reset value so selecting the same file again still triggers change
+                    this.value = "";
+                    if (!file) return;
+                    const text = await file.text();
+                    importStateFromText(text);
+                } catch (err) {
+                    console.error(err);
+                    toast("导入失败");
+                } finally {
+                    $f.off("change._import");
+                }
+            });
+            $f.val("");
+            $f.trigger("click");
+        } catch (e) {
+            if (e && e.name === "AbortError") return;
+            console.error(e);
+            toast("导入失败");
+        }
+    }
+
+    
+
+    async function resetAllToDefault() {
+        const ok = await confirmBox({
+            title: "恢复默认设置",
+            message: "这将把默认卡片（命令列表）和默认发射器/粒子参数全部恢复为初始值，并覆盖浏览器保存的上一次编辑结果。\n\n确认继续？",
+            okText: "恢复默认",
+            cancelText: "取消",
+            okDanger: true,
+        });
+        if (!ok) return;
+
+        // 退出全屏（如果在全屏）
+        if (state.fullscreen) setFullscreen(false);
+
+        // 恢复基础参数
+        state.playing = DEFAULT_BASE_STATE.playing;
+        state.ticksPerSecond = DEFAULT_BASE_STATE.ticksPerSecond;
+        state.fullscreen = false;
+        state.emitter = deepCopy(DEFAULT_BASE_STATE.emitter);
+        state.particle = deepCopy(DEFAULT_BASE_STATE.particle);
+        state.kotlin = deepCopy(DEFAULT_BASE_STATE.kotlin);
+
+        // 恢复默认卡片
+        state.commands = makeDefaultCommands();
+
+        // 应用到 UI
+        applyStateToForm();
+        setEmitterSection();
+        renderCommandList();
+        autoGenKotlin();
+
+        // 重置撤回/重做栈
+        cardHistory.init();
+
+        // 清空预览粒子
+        clearParticles();
+
+        scheduleSave();
+        toast("已恢复默认");
+    }
+
 
     // ---------- Minimal Orbit Controls (pointer events) ----------
     function createMiniOrbit(camera, dom) {
@@ -1045,14 +1399,14 @@ import * as THREE from 'three';
             case "ParticleVortexCommand": {
                 const cx = Number(p.centerX) || 0, cy = Number(p.centerY) || 0, cz = Number(p.centerZ) || 0;
 
-                const ax = Number(p.axisX) || 0, ay = Number(p.axisY) || 1, az = Number(p.axisZ) || 0;
-                const axis = vec3(ax, ay, az);
+                const ax0 = Number(p.axisX) || 0, ay0 = Number(p.axisY) || 1, az0 = Number(p.axisZ) || 0;
+                const axis = vec3(ax0, ay0, az0);
                 const axisLen = axis.length();
                 if (axisLen < 1e-9) break;
                 axis.multiplyScalar(1.0 / axisLen);
 
                 const swirlStrength = Number(p.swirlStrength) || 0;
-                const radialPull = Number(p.radialPull) || 0;     // 正值=吸入
+                const radialPull = Number(p.radialPull) || 0;   // 正值=吸向 center
                 const axialLift = Number(p.axialLift) || 0;
 
                 const range = Number(p.range) || 1;
@@ -1061,31 +1415,26 @@ import * as THREE from 'three';
 
                 const center = vec3(cx, cy, cz);
 
-                // inward：完整指向中心向量，并用它的距离做 falloff（和 MC 更一致）
-                const toCenter = center.clone().sub(particle.pos);
-                const d0 = toCenter.length();
-                if (d0 < 1e-9) break;
-                const d = Math.max(d0, minDistance);
-                const falloff = inversePowerFalloff(d, range, falloffPower);
+                // r: from center -> particle
+                const r = particle.pos.clone().sub(center);
+                const dist0 = r.length();
+                if (dist0 < 1e-9) break;
 
-                const inward = toCenter.multiplyScalar(1.0 / d); // 指向中心（单位向量）
+                const dist = Math.max(dist0, minDistance);
+                const falloff = inversePowerFalloff(dist, range, falloffPower);
 
-                // 把 inward 投影到“垂直于 axis 的平面”作为径向，保证 swirl 真正在圆周切向旋转
-                const axialComp = axis.clone().multiplyScalar(inward.dot(axis));
-                let radial = inward.clone().sub(axialComp); // 平面径向（仍指向中心）
-                const rLen = radial.length();
-                if (rLen < 1e-9) radial = anyPerpToAxis(axis);
-                else radial.multiplyScalar(1.0 / rLen);
-
-                // 切向：radial × axis（注意顺序！这会决定顺/逆时针；MC 是向内旋转，你这里用 radial×axis）
-                let tang = radial.clone().cross(axis);
+                // tangential: axis × r
+                const tang = axis.clone().cross(r);
                 const tLen = tang.length();
-                if (tLen < 1e-9) tang = anyPerpToAxis(axis);
-                else tang.multiplyScalar(1.0 / tLen);
+                if (tLen < 1e-9) break;
+                tang.multiplyScalar(1.0 / tLen);
+
+                // inward: particle -> center
+                const inward = r.multiplyScalar(-1.0 / dist);
 
                 const dv = vec3(0, 0, 0)
-                    .add(tang.multiplyScalar(-swirlStrength * falloff))      // 旋转
-                    .add(inward.multiplyScalar(radialPull * falloff))       // 吸入
+                    .add(tang.multiplyScalar(swirlStrength * falloff))     // 旋转
+                    .add(inward.multiplyScalar(radialPull * falloff))      // 吸入
                     .add(axis.clone().multiplyScalar(axialLift * falloff)); // 轴向
 
                 particle.vel.add(dv);
@@ -1329,6 +1678,8 @@ import * as THREE from 'three';
             const id = $(this).closest(".cmdCard").data("id");
             const cmd = state.commands.find(x => x.id === id);
             cmd.enabled = $(this).is(":checked");
+            scheduleHistoryPush();
+            scheduleSave();
             autoGenKotlin();
         });
 
@@ -1347,12 +1698,16 @@ import * as THREE from 'three';
             else v = safeNum($(this).val(), field.def);
 
             cmd.params[key] = v;
+            scheduleHistoryPush();
+            scheduleSave();
             autoGenKotlin();
         });
 
         $(".btnDel").off("click").on("click", function () {
             const id = $(this).closest(".cmdCard").data("id");
             state.commands = state.commands.filter(x => x.id !== id);
+            cardHistory.push();
+            scheduleSave();
             renderCommandList();
             autoGenKotlin();
         });
@@ -1363,6 +1718,8 @@ import * as THREE from 'three';
             const copy = JSON.parse(JSON.stringify(cmd));
             copy.id = cryptoRandomId();
             state.commands.push(copy);
+            cardHistory.push();
+            scheduleSave();
             renderCommandList();
             autoGenKotlin();
         });
@@ -1374,6 +1731,8 @@ import * as THREE from 'three';
                 onEnd: () => {
                     const ids = $("#cmdList .cmdCard").map((_, el) => $(el).data("id")).get();
                     state.commands = ids.map(id => state.commands.find(x => x.id === id)).filter(Boolean);
+                    cardHistory.push();
+                    scheduleSave();
                     autoGenKotlin();
                 }
             });
@@ -1453,6 +1812,64 @@ import * as THREE from 'three';
         toastTimer = setTimeout(() => $t.css("opacity", "0"), 1400);
     }
 
+    // ---------- pretty confirm (no native confirm/alert) ----------
+
+    function confirmBox({
+        title = "确认",
+        message = "确定要继续吗？",
+        okText = "确定",
+        cancelText = "取消",
+        okDanger = true,
+    } = {}) {
+        return new Promise((resolve) => {
+            const $mask = $(
+                `<div id="_confirmMask" style="
+                    position:fixed; inset:0; z-index:100000;
+                    background:rgba(0,0,0,.55);
+                    display:flex; align-items:center; justify-content:center;
+                    backdrop-filter: blur(10px);
+                "></div>`
+            );
+
+            const okCls = okDanger ? "danger" : "primary";
+            const $card = $(
+                `<div style="
+                    width:min(520px, calc(100vw - 24px));
+                    border-radius:16px;
+                    border:1px solid rgba(255,255,255,.12);
+                    background: linear-gradient(180deg, rgba(16,24,38,.98), rgba(16,24,38,.86));
+                    box-shadow: 0 20px 60px rgba(0,0,0,.55);
+                    padding:14px;
+                ">
+                    <div style="font-weight:900; margin-bottom:8px;">${escapeHtml(title)}</div>
+                    <div style="color:var(--muted); line-height:1.6; white-space:pre-wrap;">${escapeHtml(message)}</div>
+                    <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:14px;">
+                        <button class="btn" id="_confirmCancel">${escapeHtml(cancelText)}</button>
+                        <button class="btn ${okCls}" id="_confirmOk">${escapeHtml(okText)}</button>
+                    </div>
+                </div>`
+            );
+
+            function close(ret) {
+                $(document).off("keydown._confirm");
+                $mask.remove();
+                resolve(ret);
+            }
+
+            $mask.on("click", (e) => {
+                if (e.target === $mask[0]) close(false);
+            });
+            $card.find("#_confirmCancel").on("click", () => close(false));
+            $card.find("#_confirmOk").on("click", () => close(true));
+            $(document).on("keydown._confirm", (e) => {
+                if (e.key === "Escape") close(false);
+            });
+
+            $mask.append($card);
+            $("body").append($mask);
+        });
+    }
+
     // ---------- fullscreen ----------
     function setFullscreen(on) {
         state.fullscreen = !!on;
@@ -1477,10 +1894,12 @@ import * as THREE from 'three';
         $("#ticksPerSecond,#lifeMin,#lifeMax,#sizeMin,#sizeMax,#countMin,#countMax,#velX,#velY,#velZ,#velSpeed,#visibleRange,#colStart,#colEnd,#kVarName,#kRefName,#emitOffX,#emitOffY,#emitOffZ")
             .on("input change", () => {
                 readBaseForm();
+                scheduleSave();
             });
         $("#boxX,#boxY,#boxZ,#boxDensity,#boxSurface,#sphereR,#sphereSurfR,#ringR,#ringThickness,#ringAx,#ringAy,#ringAz")
             .on("input change", () => {
                 readBaseForm();
+                scheduleSave();
             });
 
         $("#btnPlay").on("click", () => {
@@ -1499,6 +1918,8 @@ import * as THREE from 'three';
         $("#btnAddCmd").on("click", () => {
             const type = $("#addCommandType").val();
             state.commands.push(newCommand(type));
+            cardHistory.push();
+            scheduleSave();
             renderCommandList();
             autoGenKotlin();
         });
@@ -1512,12 +1933,49 @@ import * as THREE from 'three';
             copyKotlin();
         });
 
-        $("#btnFull, #btnFullTop").on("click", () => setFullscreen(true));
+        
+
+        $("#btnExportJson").on("click", () => exportStateJson());
+        $("#btnImportJson").on("click", () => importStateJson());
+        $("#btnResetAll").on("click", () => resetAllToDefault());
+
+        $("#btnImportJson").on("change", async function () {
+            const file = this.files && this.files[0];
+            if (!file) return;
+            try {
+                const text = await file.text();
+                importStateFromText(text);
+            } catch (e) {
+                console.error(e);
+                toast("导入失败");
+            }
+        });
+$("#btnFull, #btnFullTop").on("click", () => setFullscreen(true));
         $("#btnExitFull").on("click", () => setFullscreen(false));
 
-        // ESC 退出全屏
+        // 快捷键：撤回/重做（不在输入框时） + ESC 退出全屏
         window.addEventListener("keydown", (e) => {
-            if (e.key === "Escape" && state.fullscreen) setFullscreen(false);
+            if (e.key === "Escape" && state.fullscreen) {
+                setFullscreen(false);
+                return;
+            }
+
+            const el = document.activeElement;
+            const isEditable = !!el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/i.test(el.tagName));
+            if (isEditable) return;
+
+            const isMac = /Mac|iPhone|iPad|iPod/i.test(navigator.platform);
+            const mod = isMac ? e.metaKey : e.ctrlKey;
+            if (!mod) return;
+
+            const k = (e.key || "").toLowerCase();
+            if (k === "z" && !e.shiftKey) {
+                e.preventDefault();
+                cardHistory.undoOnce();
+            } else if (k === "y" || (k === "z" && e.shiftKey)) {
+                e.preventDefault();
+                cardHistory.redoOnce();
+            }
         });
     }
 
@@ -1543,13 +2001,18 @@ import * as THREE from 'three';
     }
 
     function boot() {
-        state.commands.push(newCommand("ParticleNoiseCommand"));
-        state.commands.push(newCommand("ParticleDragCommand"));
+        const loaded = loadPersisted();
+        if (!loaded) {
+            state.commands.push(newCommand("ParticleNoiseCommand"));
+            state.commands.push(newCommand("ParticleDragCommand"));
+        }
 
+        applyStateToForm();
         setEmitterSection();
         renderCommandList();
         autoGenKotlin();
-
+        cardHistory.init();
+        scheduleSave();
 
         initThree();
         animate();
