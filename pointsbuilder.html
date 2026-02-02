@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>PointsBuilder 可视化构建器</title>
+    <link rel="stylesheet" href="/css/PointsBuilder/style.css" />
+</head>
+<body>
+<div id="app">
+    <header class="topbar">
+        <div class="topbar-left">
+            <div class="brand">
+                <div class="brand-title">PointsBuilder 可视化构建器</div>
+                <div class="brand-sub">卡片编辑 / Three.js 预览 / Kotlin 导出</div>
+            </div>
+        </div>
+
+        <div class="topbar-right">
+            <button id="btnAddCard" class="btn primary">添加卡片</button>
+            <button id="btnQuickOffset" class="btn">快捷 Offset</button>
+            <button id="btnPickLine" class="btn">XZ 拾取直线</button>
+            <button id="btnFullscreen" class="btn">预览全屏</button>
+
+            <span class="sep"></span>
+
+            <button id="btnExportKotlin" class="btn primary">生成 Kotlin</button>
+            <button id="btnCopyKotlin" class="btn">复制 Kotlin</button>
+
+            <span class="sep"></span>
+
+            <button id="btnSaveJson" class="btn">导出 JSON</button>
+            <button id="btnLoadJson" class="btn">导入 JSON</button>
+            <input id="fileJson" type="file" accept="application/json" hidden />
+            <button id="btnReset" class="btn danger">重置</button>
+        </div>
+    </header>
+
+    <main class="layout">
+        <aside class="panel left">
+            <div class="panel-title">构建卡片</div>
+            <div id="cardsRoot" class="cards"></div>
+            <div class="panel-footnote">
+                提示：拖拽“≡”可排序；嵌套卡片在父卡片内；右侧输出 Kotlin。
+            </div>
+        </aside>
+
+        <section class="viewer">
+            <div class="viewer-hud">
+                <div class="hud-left">
+                    <div id="statusLinePick" class="badge hidden"></div>
+                    <div id="statusPoints" class="badge">点数：0</div>
+                </div>
+                <div class="hud-right">
+                    <label class="chk">
+                        <input id="chkAxes" type="checkbox" checked />
+                        <span>坐标轴</span>
+                    </label>
+                    <label class="chk">
+                        <input id="chkGrid" type="checkbox" checked />
+                        <span>网格</span>
+                    </label>
+                    <label class="chk">
+                        <input id="chkAutoFit" type="checkbox" checked />
+                        <span>自动缩放</span>
+                    </label>
+                    <label class="chk"><input id="chkSnapGrid" type="checkbox">吸附网格</label>
+                </div>
+            </div>
+            <div id="threeHost" class="three-host"></div>
+        </section>
+
+        <aside class="panel right">
+            <div class="panel-title">Kotlin 代码</div>
+            <textarea id="kotlinOut" class="code" spellcheck="false"></textarea>
+
+            <div class="panel-actions">
+                <button id="btnCopyKotlin2" class="btn">复制</button>
+                <button id="btnExportKotlin2" class="btn primary">重新生成</button>
+            </div>
+
+            <div class="panel-footnote">
+                角度输入为“度”，导出会转换为“弧度表达式”：<code>x*PI</code>（x 已计算）。
+            </div>
+        </aside>
+    </main>
+
+    <div id="modalMask" class="modal-mask hidden"></div>
+    <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
+        <div class="modal-head">
+            <div class="modal-title">添加卡片</div>
+            <input id="cardSearch" class="input" placeholder="搜索：addCircle / rotateTo / Fourier ..." />
+            <button id="btnCloseModal" class="btn icon">✕</button>
+        </div>
+        <div class="modal-body">
+            <div id="cardPicker" class="picker"></div>
+        </div>
+        <div class="modal-foot">
+            <button id="btnCancelModal" class="btn">取消</button>
+        </div>
+    </div>
+</div>
+
+<!-- 固定到 r149：避免 r150+ 的 deprecated 提示，同时保持纯 script 引入可 file:// 直接运行 -->
+<script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.min.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.182.0/examples/jsm/"
+      }
+    }
+</script>
+<script src="/js/PointsBuilder/utils.js"></script>
+<script type="module" src="/js/PointsBuilder/main.js"></script>
+</body>
+</html>
