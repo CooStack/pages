@@ -39,6 +39,7 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
     const chkAutoFit = document.getElementById("chkAutoFit");
     const chkSnapGrid = document.getElementById("chkSnapGrid");
     const chkSnapParticle = document.getElementById("chkSnapParticle");
+    const inpPointSize = document.getElementById("inpPointSize");
     const inpSnapStep = document.getElementById("inpSnapStep");
     const statusLinePick = document.getElementById("statusLinePick");
     const statusPoints = document.getElementById("statusPoints");
@@ -614,7 +615,8 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
     let hoverMarker = null;   // ✅ 实时跟随的红点
     let lastPoints = [];      // ✅ 当前预览点，用于“吸附到最近点”（如果你也想保留这个功能）
     let pickMarkers = [];
-    const GRID_STEP = 1;      // ✅ 网格吸附步长（你 GridHelper 40/40 时就是 1）
+    let pointSize = 0.2;     // ✅ 粒子大小（PointsMaterial.size）
+    let markerRadius = 0.12;  // ✅ 拾取红点大小（可选随 pointSize 变化）
     // line pick state (可指向主/任意子 builder)
     let linePickMode = false;
     let picked = [];
@@ -641,7 +643,7 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
 
     function ensureHoverMarker() {
         if (hoverMarker) return;
-        const geom = new THREE.SphereGeometry(0.12, 16, 12);
+        const geom = new THREE.SphereGeometry(markerRadius, 16, 12);
         const mat = new THREE.MeshBasicMaterial({color: 0xff3333});
         hoverMarker = new THREE.Mesh(geom, mat);
         hoverMarker.visible = false;
@@ -659,7 +661,7 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
     }
 
     function addPickMarker(p, hex) {
-        const geom = new THREE.SphereGeometry(0.12, 16, 12);
+        const geom = new THREE.SphereGeometry(markerRadius, 16, 12);
         const mat = new THREE.MeshBasicMaterial({color: hex});
         const mesh = new THREE.Mesh(geom, mat);
         mesh.position.set(p.x, p.y, p.z);
@@ -702,12 +704,74 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         hoverMarker.visible = false;
     }
 
+    function clampNum(v, min, max) {
+        const x = Number(v);
+        if (!Number.isFinite(x)) return min;
+        return Math.max(min, Math.min(max, x));
+    }
+
+    function setPointSize(v) {
+        pointSize = clampNum(v, 0.001, 5);
+
+        // ✅ 更新点云材质（不会重置相机）
+        if (pointsObj && pointsObj.material) {
+            pointsObj.material.size = pointSize;
+            pointsObj.material.needsUpdate = true;
+        }
+
+        // ✅ 可选：让拾取红点跟着变大/变小（你不想联动就删掉这一段）
+        const r = Math.max(0.04, pointSize * 1.6);
+        if (Math.abs(r - markerRadius) > 1e-6) {
+            markerRadius = r;
+
+            // 更新 hover marker
+            if (hoverMarker) {
+                hoverMarker.geometry.dispose();
+                hoverMarker.geometry = new THREE.SphereGeometry(markerRadius, 16, 12);
+            }
+
+            // 更新已选点 marker
+            if (pickMarkers && pickMarkers.length) {
+                for (const m of pickMarkers) {
+                    if (!m) continue;
+                    if (m.geometry) m.geometry.dispose();
+                    m.geometry = new THREE.SphereGeometry(markerRadius, 16, 12);
+                }
+            }
+        }
+    }
+
     function getSnapStep() {
         const v = parseFloat(inpSnapStep?.value);
         if (!Number.isFinite(v) || v <= 0) return 1;
         return v;
     }
+    function nearestPointXZCandidate(raw, maxDist = 0.35) {
+        if (!lastPoints || lastPoints.length === 0) return null;
 
+        let best = null;
+        let bestD2 = Infinity;
+
+        for (const q of lastPoints) {
+            const dx = q.x - raw.x;
+            const dz = q.z - raw.z;
+            const d2 = dx * dx + dz * dz;
+            if (d2 < bestD2) {
+                bestD2 = d2;
+                best = q;
+            }
+        }
+
+        if (!best) return null;
+
+        const limit2 = maxDist * maxDist;
+        if (bestD2 > limit2) return null; // ✅ 超过阈值：视为“没有粒子候选”
+
+        return {
+            point: { x: best.x, y: raw.y, z: best.z },
+            d2: bestD2
+        };
+    }
     function snapToGrid(p, step) {
         const s = step || 1;
         return {
@@ -735,24 +799,42 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         return p;
     }
 
-// ✅ 拾取映射入口：先得到平面点 -> 若开启网格吸附则吸附网格，否则吸附最近点（你可改优先级）
-    function mapPickPoint(hitVec3) {
-        let p = { x: hitVec3.x, y: 0, z: hitVec3.z };
-
-        // 1) 网格吸附（优先级最高）
-        if (chkSnapGrid && chkSnapGrid.checked) {
-            p = snapToGrid(p, getSnapStep());
-            return p;
-        }
-
-        // 2) 粒子吸附（只有开关打开才吸附）
-        if (chkSnapParticle && chkSnapParticle.checked) {
-            p = snapToNearestPointXZ(p, 0.35);
-        }
-
-        // 3) 都没开 => 原始点击点
-        return p;
+    function dist2XZ(a, b) {
+        const dx = a.x - b.x;
+        const dz = a.z - b.z;
+        return dx * dx + dz * dz;
     }
+
+    function mapPickPoint(hitVec3) {
+        const raw = { x: hitVec3.x, y: 0, z: hitVec3.z };
+
+        const useGrid = chkSnapGrid && chkSnapGrid.checked;
+        const useParticle = chkSnapParticle && chkSnapParticle.checked;
+
+        // 都不开
+        if (!useGrid && !useParticle) return raw;
+
+        // 只开网格
+        if (useGrid && !useParticle) {
+            return snapToGrid(raw, getSnapStep());
+        }
+
+        // 只开粒子
+        if (!useGrid && useParticle) {
+            const cand = nearestPointXZCandidate(raw, 0.35);
+            return cand ? cand.point : raw; // ✅ 没粒子候选就不吸附
+        }
+
+        // ✅ 两个都开：比较“网格候选”和“粒子候选”，取更近
+        const gridP = snapToGrid(raw, getSnapStep());
+        const dGrid = dist2XZ(raw, gridP);
+
+        const cand = nearestPointXZCandidate(raw, 0.35);
+        const dParticle = cand ? cand.d2 : Infinity; // ✅ 没粒子候选 => 视为无穷远
+
+        return (dParticle <= dGrid) ? cand.point : gridP;
+    }
+
 
     function initThree() {
         renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
@@ -812,6 +894,13 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
                 // 或者你也可以在这里主动调用 showHoverMarker(当前映射点)
             }
         });
+        if (inpPointSize) {
+            inpPointSize.value = String(pointSize);
+            inpPointSize.addEventListener("input", () => {
+                setPointSize(inpPointSize.value);
+            });
+        }
+
         animate();
     }
 
@@ -847,7 +936,7 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         geom.setAttribute("position", new THREE.BufferAttribute(arr, 3));
         geom.computeBoundingSphere();
 
-        const mat = new THREE.PointsMaterial({size: 0.07, sizeAttenuation: true});
+        const mat = new THREE.PointsMaterial({ size: pointSize, sizeAttenuation: true });
         pointsObj = new THREE.Points(geom, mat);
         scene.add(pointsObj);
 

@@ -65,16 +65,22 @@
                         <span>自动缩放</span>
                     </label>
                     <label class="chk">
-                        <input id="chkSnapGrid" type="checkbox">
+                        <input id="chkSnapGrid" type="checkbox" checked/>
                         吸附网格
                         <span style="opacity:.7; margin-left:6px;">步长</span>
                         <input id="inpSnapStep" type="number" value="1" step="0.1" min="0.000001"
                                style="width:72px; height:24px; margin-left:6px;">
                     </label>
                     <label class="chk">
-                        <input id="chkSnapParticle" type="checkbox">
+                        <input id="chkSnapParticle" type="checkbox" checked>
                         吸附粒子
                     </label>
+                    <label class="chk">
+                        <span style="opacity:.7;">粒子大小</span>
+                        <input id="inpPointSize" type="number" value="0.07" step="0.01" min="0.001" max="5"
+                               style="width:76px; height:24px; margin-left:6px;">
+                    </label>
+
                 </div>
             </div>
             <div id="threeHost" class="three-host"></div>
