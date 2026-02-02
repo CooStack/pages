@@ -616,7 +616,6 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
     let lastPoints = [];      // ✅ 当前预览点，用于“吸附到最近点”（如果你也想保留这个功能）
     let pickMarkers = [];
     let pointSize = 0.2;     // ✅ 粒子大小（PointsMaterial.size）
-    let markerRadius = 0.12;  // ✅ 拾取红点大小（可选随 pointSize 变化）
     // line pick state (可指向主/任意子 builder)
     let linePickMode = false;
     let picked = [];
@@ -643,7 +642,7 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
 
     function ensureHoverMarker() {
         if (hoverMarker) return;
-        const geom = new THREE.SphereGeometry(markerRadius, 16, 12);
+        const geom = new THREE.SphereGeometry(0.12, 16, 12);
         const mat = new THREE.MeshBasicMaterial({color: 0xff3333});
         hoverMarker = new THREE.Mesh(geom, mat);
         hoverMarker.visible = false;
@@ -661,7 +660,7 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
     }
 
     function addPickMarker(p, hex) {
-        const geom = new THREE.SphereGeometry(markerRadius, 16, 12);
+        const geom = new THREE.SphereGeometry(0.12, 16, 12);
         const mat = new THREE.MeshBasicMaterial({color: hex});
         const mesh = new THREE.Mesh(geom, mat);
         mesh.position.set(p.x, p.y, p.z);
@@ -719,26 +718,6 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
             pointsObj.material.needsUpdate = true;
         }
 
-        // ✅ 可选：让拾取红点跟着变大/变小（你不想联动就删掉这一段）
-        const r = Math.max(0.04, pointSize * 1.6);
-        if (Math.abs(r - markerRadius) > 1e-6) {
-            markerRadius = r;
-
-            // 更新 hover marker
-            if (hoverMarker) {
-                hoverMarker.geometry.dispose();
-                hoverMarker.geometry = new THREE.SphereGeometry(markerRadius, 16, 12);
-            }
-
-            // 更新已选点 marker
-            if (pickMarkers && pickMarkers.length) {
-                for (const m of pickMarkers) {
-                    if (!m) continue;
-                    if (m.geometry) m.geometry.dispose();
-                    m.geometry = new THREE.SphereGeometry(markerRadius, 16, 12);
-                }
-            }
-        }
     }
 
     function getSnapStep() {
