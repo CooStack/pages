@@ -521,11 +521,11 @@ const kTrailingLambda = (expr, fallback = "this.pos") => {
                 const writable = await handle.createWritable();
                 await writable.write(json);
                 await writable.close();
-                toast("已导出 JSON");
+                toast("\u4fdd\u5b58\u6210\u529f", "success");
                 return;
             }
 
-            // fallback：下载
+            // fallback: download
             const blob = new Blob([json], {type: "application/json"});
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
@@ -535,11 +535,14 @@ const kTrailingLambda = (expr, fallback = "this.pos") => {
             a.click();
             a.remove();
             URL.revokeObjectURL(url);
-            toast("已导出 JSON（下载）");
+            toast("\u4fdd\u5b58\u6210\u529f", "success");
         } catch (e) {
-            if (e && e.name === "AbortError") return;
+            if (e && e.name === "AbortError") {
+                toast("\u53d6\u6d88\u4fdd\u5b58", "error");
+                return;
+            }
             console.error(e);
-            toast("导出失败");
+            toast(`\u4fdd\u5b58\u5931\u8d25\uff1a${e.message || e}`, "error");
         }
     }
 
@@ -547,15 +550,15 @@ const kTrailingLambda = (expr, fallback = "this.pos") => {
         let obj;
         try {
             obj = JSON.parse(text);
-        } catch (_) {
-            toast("JSON 格式错误");
+        } catch (e) {
+            toast(`\u5bfc\u5165\u5931\u8d25-\u683c\u5f0f\u9519\u8bef(${e.message || e})`, "error");
             return;
         }
 
         const s = (obj && typeof obj === "object" && obj.state) ? obj.state : obj;
         const ok = applyLoadedState(s);
         if (!ok) {
-            toast("JSON 内容不支持");
+            toast("\u5bfc\u5165\u5931\u8d25-\u683c\u5f0f\u9519\u8bef(\u5185\u5bb9\u4e0d\u652f\u6301)", "error");
             return;
         }
 
@@ -564,7 +567,7 @@ const kTrailingLambda = (expr, fallback = "this.pos") => {
         autoGenKotlin();
         cardHistory.init();
         scheduleSave();
-        toast("已导入 JSON");
+        toast("\u5bfc\u5165\u6210\u529f", "success");
     }
 
     async function importStateJson() {
@@ -583,7 +586,7 @@ const kTrailingLambda = (expr, fallback = "this.pos") => {
                 return;
             }
 
-            // fallback：隐藏 input
+            // fallback: hidden input
             const $f = $("#importFile");
             // one-shot change handler
             $f.off("change._import");
@@ -597,7 +600,7 @@ const kTrailingLambda = (expr, fallback = "this.pos") => {
                     importStateFromText(text);
                 } catch (err) {
                     console.error(err);
-                    toast("导入失败");
+                    toast(`\u5bfc\u5165\u5931\u8d25-\u683c\u5f0f\u9519\u8bef(${err.message || err})`, "error");
                 } finally {
                     $f.off("change._import");
                 }
@@ -605,13 +608,14 @@ const kTrailingLambda = (expr, fallback = "this.pos") => {
             $f.val("");
             $f.trigger("click");
         } catch (e) {
-            if (e && e.name === "AbortError") return;
+            if (e && e.name === "AbortError") {
+                toast("\u53d6\u6d88\u5bfc\u5165", "error");
+                return;
+            }
             console.error(e);
-            toast("导入失败");
+            toast(`\u5bfc\u5165\u5931\u8d25-\u683c\u5f0f\u9519\u8bef(${e.message || e})`, "error");
         }
     }
-
-    
 
     async function resetAllToDefault() {
         const ok = await confirmBox({
@@ -1797,7 +1801,7 @@ const kTrailingLambda = (expr, fallback = "this.pos") => {
     // ---------- toast ----------
     let toastTimer = null;
 
-    function toast(msg) {
+    function toast(msg, type = "info") {
         let $t = $("#_toast");
         if (!$t.length) {
             $t = $(`<div id="_toast" style="
@@ -1810,7 +1814,31 @@ const kTrailingLambda = (expr, fallback = "this.pos") => {
       "></div>`);
             $("body").append($t);
         }
-        $t.text(msg).css("opacity", "1");
+
+        const colors = {
+            info: {
+                bg: "rgba(8,12,18,.85)",
+                border: "rgba(28,42,63,.95)",
+                color: "rgba(230,238,252,.95)",
+            },
+            success: {
+                bg: "rgba(60,190,120,.75)",
+                border: "rgba(60,190,120,.95)",
+                color: "#f4fff8",
+            },
+            error: {
+                bg: "rgba(255,92,92,.75)",
+                border: "rgba(255,92,92,.95)",
+                color: "#fff1f1",
+            },
+        };
+        const c = colors[type] || colors.info;
+        $t.text(msg).css({
+            opacity: "1",
+            background: c.bg,
+            borderColor: c.border,
+            color: c.color,
+        });
         clearTimeout(toastTimer);
         toastTimer = setTimeout(() => $t.css("opacity", "0"), 1400);
     }

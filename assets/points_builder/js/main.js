@@ -97,6 +97,23 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         return `RelativeLocation(${U.fmt(num(x))}, ${U.fmt(num(y))}, ${U.fmt(num(z))})`;
     }
 
+    let toastTimer = 0;
+    function showToast(msg, type = "info") {
+        let el = document.getElementById("pbToast");
+        if (!el) {
+            el = document.createElement("div");
+            el.id = "pbToast";
+            el.className = "toast";
+            document.body.appendChild(el);
+        }
+        el.textContent = msg;
+        el.classList.remove("success", "error", "info", "show");
+        if (type) el.classList.add(type);
+        el.classList.add("show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => el.classList.remove("show"), 1600);
+    }
+
 
     // -------------------------
     // Hotkeys + Download helpers
@@ -2806,8 +2823,9 @@ function beginHotkeyCapture(target) {
             };
             saveHotkeys();
             renderHotkeysList();
+            showToast("导入成功", "success");
         } catch (e) {
-            alert("导入失败：" + e.message);
+            showToast(`导入失败-格式错误(${e.message || e})`, "error");
         } finally {
             fileHotkeys.value = "";
         }
@@ -4055,8 +4073,8 @@ function addQuickOffsetTo(list) {
     btnSaveJson.addEventListener("click", async () => {
         const text = JSON.stringify(state, null, 2);
         // 选择保存位置与名字（若浏览器支持 File System Access API）
-        try {
-            if (window.showSaveFilePicker) {
+        if (window.showSaveFilePicker) {
+            try {
                 const handle = await window.showSaveFilePicker({
                     suggestedName: "shape.json",
                     types: [{ description: "JSON", accept: {"application/json": [".json"]} }]
@@ -4064,13 +4082,24 @@ function addQuickOffsetTo(list) {
                 const writable = await handle.createWritable();
                 await writable.write(text);
                 await writable.close();
+                showToast("保存成功", "success");
+                return;
+            } catch (e) {
+                if (e && e.name === "AbortError") {
+                    showToast("取消保存", "error");
+                    return;
+                }
+                console.warn("showSaveFilePicker failed:", e);
+                showToast(`保存失败：${e.message || e}`, "error");
                 return;
             }
-        } catch (e) {
-            // 用户取消/权限问题：回退到普通下载
-            console.warn("showSaveFilePicker fallback:", e);
         }
-        downloadText("shape.json", text, "application/json");
+        try {
+            downloadText("shape.json", text, "application/json");
+            showToast("保存成功", "success");
+        } catch (e) {
+            showToast(`保存失败：${e.message || e}`, "error");
+        }
     });
 
     btnLoadJson.addEventListener("click", () => fileJson.click());
@@ -4085,8 +4114,9 @@ function addQuickOffsetTo(list) {
             state = obj;
             ensureAxisEverywhere();
             renderAll();
+            showToast("导入成功", "success");
         } catch (e) {
-            alert("JSON 解析失败：" + e.message);
+            showToast(`导入失败-格式错误(${e.message || e})`, "error");
         } finally {
             fileJson.value = "";
         }
@@ -4105,8 +4135,9 @@ function addQuickOffsetTo(list) {
             target.children = obj.root.children;
             ensureAxisInList(target.children);
             renderAll();
+            showToast("导入成功", "success");
         } catch (e) {
-            alert("JSON 解析失败：" + e.message);
+            showToast(`导入失败-格式错误(${e.message || e})`, "error");
         } finally {
             builderJsonTargetNode = null;
             fileBuilderJson.value = "";
