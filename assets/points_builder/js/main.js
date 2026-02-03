@@ -1,4 +1,4 @@
-import * as THREE from "three";
+﻿import * as THREE from "three";
 import {OrbitControls} from "three/addons/controls/OrbitControls.js";
 
 (function () {
@@ -20,6 +20,13 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
     const btnAddCard = document.getElementById("btnAddCard");
     const btnQuickOffset = document.getElementById("btnQuickOffset");
     const btnPickLine = document.getElementById("btnPickLine");
+    const pickPointBtns = Array.from(document.querySelectorAll("#btnPickPoint"));
+    const btnPickPoint = pickPointBtns[0] || null;
+    if (pickPointBtns.length > 1) {
+        for (let i = 1; i < pickPointBtns.length; i++) {
+            try { pickPointBtns[i].remove(); } catch {}
+        }
+    }
     const btnHotkeys = document.getElementById("btnHotkeys");
     const btnFullscreen = document.getElementById("btnFullscreen");
 
@@ -33,7 +40,9 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
     const btnSaveJson = document.getElementById("btnSaveJson");
     const btnLoadJson = document.getElementById("btnLoadJson");
     const fileJson = document.getElementById("fileJson");
+    const fileBuilderJson = document.getElementById("fileBuilderJson");
     const btnReset = document.getElementById("btnReset");
+    let builderJsonTargetNode = null;
 
     const modal = document.getElementById("modal");
     const modalMask = document.getElementById("modalMask");
@@ -60,9 +69,11 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
     const threeHost = document.getElementById("threeHost");
     const chkAxes = document.getElementById("chkAxes");
     const chkGrid = document.getElementById("chkGrid");
-    const chkAutoFit = document.getElementById("chkAutoFit");
+    const btnResetCamera = document.getElementById("btnResetCamera");
     const chkSnapGrid = document.getElementById("chkSnapGrid");
     const chkSnapParticle = document.getElementById("chkSnapParticle");
+    const selSnapPlane = document.getElementById("selSnapPlane");
+    const selMirrorPlane = document.getElementById("selMirrorPlane");
     const inpPointSize = document.getElementById("inpPointSize");
     const inpSnapStep = document.getElementById("inpSnapStep");
     const statusLinePick = document.getElementById("statusLinePick");
@@ -97,6 +108,15 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         actions: {
             openPicker: "KeyW",          // W
             pickLineXZ: "KeyQ",          // Q
+            pickPoint: "KeyE",           // E
+            snapPlaneXZ: "Digit1",       // 1
+            snapPlaneXY: "Digit2",       // 2
+            snapPlaneZY: "Digit3",       // 3
+            mirrorPlaneXZ: "Shift+Digit1", // Shift + 1
+            mirrorPlaneXY: "Shift+Digit2", // Shift + 2
+            mirrorPlaneZY: "Shift+Digit3", // Shift + 3
+            copyFocused: "Mod+KeyD",     // Ctrl/Cmd + D
+            mirrorCopy: "Mod+Shift+KeyM",// Ctrl/Cmd + Shift + M
             undo: "Mod+KeyZ",            // Ctrl/Cmd + Z
             redo: "Mod+Shift+KeyZ",      // Ctrl/Cmd + Shift + Z
             // 删除聚焦卡片（Mac 键盘上的“Delete”通常对应 Backspace；更通用）
@@ -793,6 +813,31 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         return raw;
     }
 
+    function mirrorPointByPlane(p, planeKey) {
+        const plane = planeKey || mirrorPlane || "XZ";
+        if (plane === "XY") return {x: p.x, y: p.y, z: -p.z};
+        if (plane === "ZY") return {x: -p.x, y: p.y, z: p.z};
+        return {x: p.x, y: -p.y, z: p.z}; // XZ
+    }
+
+    function mirrorCopyNode(node, planeKey) {
+        if (!node || !node.kind) return null;
+        const cloned = cloneNodeDeep(node);
+        if (node.kind === "add_line") {
+            const s = mirrorPointByPlane({x: node.params.sx, y: node.params.sy, z: node.params.sz}, planeKey);
+            const e = mirrorPointByPlane({x: node.params.ex, y: node.params.ey, z: node.params.ez}, planeKey);
+            cloned.params.sx = s.x; cloned.params.sy = s.y; cloned.params.sz = s.z;
+            cloned.params.ex = e.x; cloned.params.ey = e.y; cloned.params.ez = e.z;
+            return cloned;
+        }
+        if (node.kind === "points_on_each_offset") {
+            const v = mirrorPointByPlane({x: node.params.offX, y: node.params.offY, z: node.params.offZ}, planeKey);
+            cloned.params.offX = v.x; cloned.params.offY = v.y; cloned.params.offZ = v.z;
+            return cloned;
+        }
+        return null;
+    }
+
     // -------------------------
     // state
     // -------------------------
@@ -847,6 +892,7 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         isRestoringHistory = true;
         try {
             stopLinePick?.(); // 取消拾取模式，避免状态错乱
+            stopPointPick?.();
         } catch {}
         try {
             state = deepClone(snap.state);
@@ -997,6 +1043,51 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         return true;
     }
 
+    function copyFocusedCard() {
+        if (!focusedNodeId) return false;
+        const ctx = findAnyCardContextById(focusedNodeId);
+        if (!ctx || !Array.isArray(ctx.parentList)) return false;
+        historyCapture("copy_focused");
+        let cloned = null;
+        if (ctx.type === "term") {
+            cloned = JSON.parse(JSON.stringify(ctx.term));
+            cloned.id = uid();
+        } else {
+            cloned = cloneNodeDeep(ctx.node);
+        }
+        ctx.parentList.splice(ctx.index + 1, 0, cloned);
+        renderAll();
+        requestAnimationFrame(() => {
+            const el = elCardsRoot.querySelector(`.card[data-id="${cloned.id}"]`);
+            if (el) {
+                try { el.focus(); } catch {}
+                try { el.scrollIntoView({ block: "nearest" }); } catch {}
+                setFocusedNode(cloned.id, false);
+            }
+        });
+        return true;
+    }
+
+    function mirrorCopyFocusedCard() {
+        if (!focusedNodeId) return false;
+        const ctx = findNodeContextById(focusedNodeId);
+        if (!ctx || !Array.isArray(ctx.parentList)) return false;
+        const cloned = mirrorCopyNode(ctx.node, mirrorPlane);
+        if (!cloned) return false;
+        historyCapture("mirror_copy");
+        ctx.parentList.splice(ctx.index + 1, 0, cloned);
+        renderAll();
+        requestAnimationFrame(() => {
+            const el = elCardsRoot.querySelector(`.card[data-id="${cloned.id}"]`);
+            if (el) {
+                try { el.focus(); } catch {}
+                try { el.scrollIntoView({ block: "nearest" }); } catch {}
+                setFocusedNode(cloned.id, false);
+            }
+        });
+        return true;
+    }
+
     function nodeContainsId(node, id) {
         if (!node) return false;
         if (node.id === id) return true;
@@ -1122,9 +1213,16 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
     // -------------------------
     let renderer, scene, camera, controls;
     let pointsObj = null;
-    let axesHelper, gridHelper;
+    let axesHelper, gridHelper, axisLabelGroup;
     let raycaster, mouse;
     let pickPlane;
+    const SNAP_PLANES = {
+        XZ: {label: "XZ", normal: new THREE.Vector3(0, 1, 0), axis: "XZ"},
+        XY: {label: "XY", normal: new THREE.Vector3(0, 0, 1), axis: "XY"},
+        ZY: {label: "ZY", normal: new THREE.Vector3(1, 0, 0), axis: "ZY"},
+    };
+    let snapPlane = "XZ";
+    let mirrorPlane = "XZ";
     let hoverMarker = null;   // ✅ 实时跟随的红点
     let lastPoints = [];      // ✅ 当前预览点，用于“吸附到最近点”
 
@@ -1150,7 +1248,17 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
     let linePickKeepFocusId = null;
     // ✅ 解决：拾取直线时 pointerdown 处理完后仍会触发 click 事件，可能导致焦点被 onCanvasClick 清空
     let suppressNextCanvasClick = false;
-    let needAutoFit = true
+    // point pick state (for axis/start/end/vec3 fields)
+    let pointPickMode = false;
+    let pointPickTarget = null;
+    let pointPickKeepFocusId = null;
+    let activeVecTarget = null;
+    const panKeyState = {ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false};
+    const PAN_KEY_SPEED = 0.0025;
+    const _panDir = new THREE.Vector3();
+    const _panRight = new THREE.Vector3();
+    const _panUp = new THREE.Vector3();
+    const _panMove = new THREE.Vector3();
 
     let _rClickT = 0;
     let _rClickX = 0;
@@ -1167,6 +1275,39 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         // 2) 右键按下位掩码：buttons&2
         // 3) macOS Ctrl+Click：button===0 且 ctrlKey=true
         return ev.button === 2 || (ev.buttons & 2) === 2 || (ev.button === 0 && ev.ctrlKey);
+    }
+
+    function isArrowKey(code) {
+        return code === "ArrowUp" || code === "ArrowDown" || code === "ArrowLeft" || code === "ArrowRight";
+    }
+
+    function shouldIgnoreArrowPan() {
+        if ((modal && !modal.classList.contains("hidden")) || (hkModal && !hkModal.classList.contains("hidden"))) return true;
+        const ae = document.activeElement;
+        if (!ae) return false;
+        const tag = (ae.tagName || "").toUpperCase();
+        if (tag === "INPUT" || tag === "TEXTAREA") return true;
+        if (ae.isContentEditable) return true;
+        return false;
+    }
+
+    function applyArrowPan() {
+        if (!controls || !camera) return;
+        if (!panKeyState.ArrowUp && !panKeyState.ArrowDown && !panKeyState.ArrowLeft && !panKeyState.ArrowRight) return;
+        const dist = camera.position.distanceTo(controls.target);
+        const step = Math.max(0.0001, dist * PAN_KEY_SPEED) * (controls.panSpeed || 1);
+        camera.getWorldDirection(_panDir);
+        _panRight.crossVectors(_panDir, camera.up).normalize();
+        _panUp.copy(camera.up).normalize();
+        _panMove.set(0, 0, 0);
+        if (panKeyState.ArrowLeft) _panMove.addScaledVector(_panRight, -step);
+        if (panKeyState.ArrowRight) _panMove.addScaledVector(_panRight, step);
+        if (panKeyState.ArrowUp) _panMove.addScaledVector(_panUp, step);
+        if (panKeyState.ArrowDown) _panMove.addScaledVector(_panUp, -step);
+        if (_panMove.lengthSq() > 0) {
+            controls.target.add(_panMove);
+            camera.position.add(_panMove);
+        }
     }
 
     function ensureHoverMarker() {
@@ -1254,95 +1395,197 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         if (!Number.isFinite(v) || v <= 0) return 1;
         return v;
     }
-    function nearestPointXZCandidate(raw, maxDist = 0.35) {
-        if (!lastPoints || lastPoints.length === 0) return null;
-
-        let best = null;
-        let bestD2 = Infinity;
-
-        for (const q of lastPoints) {
-            const dx = q.x - raw.x;
-            const dz = q.z - raw.z;
-            const d2 = dx * dx + dz * dz;
-            if (d2 < bestD2) {
-                bestD2 = d2;
-                best = q;
-            }
-        }
-
-        if (!best) return null;
-
-        const limit2 = maxDist * maxDist;
-        if (bestD2 > limit2) return null; // ✅ 超过阈值：视为“没有粒子候选”
-
-        return {
-            point: { x: best.x, y: raw.y, z: best.z },
-            d2: bestD2
-        };
+    function getPlaneInfo() {
+        return SNAP_PLANES[snapPlane] || SNAP_PLANES.XZ;
     }
-    function snapToGrid(p, step) {
+
+    function getMirrorPlaneInfo() {
+        return SNAP_PLANES[mirrorPlane] || SNAP_PLANES.XZ;
+    }
+
+    function updateGridForPlane() {
+        if (!gridHelper) return;
+        const info = getPlaneInfo();
+        gridHelper.rotation.set(0, 0, 0);
+        if (info.axis === "XY") {
+            gridHelper.rotation.x = Math.PI / 2;
+        } else if (info.axis === "ZY") {
+            gridHelper.rotation.z = -Math.PI / 2;
+        }
+        if (info.normal) {
+            gridHelper.position.set(info.normal.x * -0.01, info.normal.y * -0.01, info.normal.z * -0.01);
+        }
+    }
+
+    function makeAxisLabelSprite(text, colorHex) {
+        const size = 128;
+        const canvas = document.createElement("canvas");
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, size, size);
+        ctx.font = "bold 56px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(text, size / 2, size / 2);
+        ctx.strokeStyle = "rgba(0,0,0,0.6)";
+        ctx.lineWidth = 6;
+        ctx.strokeText(text, size / 2, size / 2);
+
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.minFilter = THREE.LinearFilter;
+        tex.needsUpdate = true;
+        const mat = new THREE.SpriteMaterial({map: tex, transparent: true, color: colorHex});
+        const sprite = new THREE.Sprite(mat);
+        sprite.material.depthTest = false;
+        sprite.renderOrder = 10;
+        return sprite;
+    }
+
+    function buildAxisLabels() {
+        if (!scene) return;
+        if (axisLabelGroup) {
+            scene.remove(axisLabelGroup);
+        }
+        axisLabelGroup = new THREE.Group();
+        const len = 5.6;
+        const sx = makeAxisLabelSprite("+X", 0xff5555);
+        const sy = makeAxisLabelSprite("+Y", 0x55ff55);
+        const sz = makeAxisLabelSprite("+Z", 0x5599ff);
+        sx.position.set(len, 0, 0);
+        sy.position.set(0, len, 0);
+        sz.position.set(0, 0, len);
+        axisLabelGroup.add(sx, sy, sz);
+        axisLabelGroup.visible = !!(chkAxes && chkAxes.checked);
+        scene.add(axisLabelGroup);
+        updateAxisLabelScale();
+    }
+
+    function updateAxisLabelScale() {
+        if (!axisLabelGroup || !camera || !controls) return;
+        const dist = camera.position.distanceTo(controls.target);
+        const scale = Math.max(0.6, dist * 0.04);
+        axisLabelGroup.children.forEach((s) => {
+            s.scale.set(scale, scale, scale);
+        });
+    }
+
+    function mapHitToPlaneRaw(hitVec3) {
+        const plane = getPlaneInfo().axis;
+        if (plane === "XY") return {x: hitVec3.x, y: hitVec3.y, z: 0};
+        if (plane === "ZY") return {x: 0, y: hitVec3.y, z: hitVec3.z};
+        return {x: hitVec3.x, y: 0, z: hitVec3.z};
+    }
+
+    function snapToGridOnPlane(p, step, planeKey) {
         const s = step || 1;
-        return {
-            x: Math.round(p.x / s) * s,
-            y: p.y,
-            z: Math.round(p.z / s) * s
-        };
+        const plane = planeKey || getPlaneInfo().axis;
+        if (plane === "XY") {
+            return {x: Math.round(p.x / s) * s, y: Math.round(p.y / s) * s, z: p.z};
+        }
+        if (plane === "ZY") {
+            return {x: p.x, y: Math.round(p.y / s) * s, z: Math.round(p.z / s) * s};
+        }
+        return {x: Math.round(p.x / s) * s, y: p.y, z: Math.round(p.z / s) * s};
     }
 
-// 可选：吸附到最近已有点（XZ 平面距离）
-    function snapToNearestPointXZ(p, dist = 0.35) {
-        if (!lastPoints || lastPoints.length === 0) return p;
+    function dist2(a, b) {
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        const dz = a.z - b.z;
+        return dx * dx + dy * dy + dz * dz;
+    }
+
+    function nearestPointCandidate(ref, maxDist = 0.35) {
+        if (!lastPoints || lastPoints.length === 0) return null;
         let best = null;
         let bestD2 = Infinity;
         for (const q of lastPoints) {
-            const dx = q.x - p.x;
-            const dz = q.z - p.z;
-            const d2 = dx * dx + dz * dz;
+            const d2 = dist2(ref, q);
             if (d2 < bestD2) {
                 bestD2 = d2;
                 best = q;
             }
         }
-        if (best && bestD2 <= dist * dist) return {x: best.x, y: p.y, z: best.z};
-        return p;
+        if (!best) return null;
+        const limit2 = maxDist * maxDist;
+        if (bestD2 > limit2) return null;
+        return {point: {x: best.x, y: best.y, z: best.z}, d2: bestD2};
     }
 
-    function dist2XZ(a, b) {
-        const dx = a.x - b.x;
-        const dz = a.z - b.z;
-        return dx * dx + dz * dz;
-    }
-
-    function mapPickPoint(hitVec3) {
-        const raw = { x: hitVec3.x, y: 0, z: hitVec3.z };
+    function mapPickPoint(hitVec3, particlePoint = null) {
+        const raw = mapHitToPlaneRaw(hitVec3);
 
         const useGrid = chkSnapGrid && chkSnapGrid.checked;
         const useParticle = chkSnapParticle && chkSnapParticle.checked;
 
-        // 都不开
         if (!useGrid && !useParticle) return raw;
 
-        // 只开网格
-        if (useGrid && !useParticle) {
-            return snapToGrid(raw, getSnapStep());
+        const gridP = useGrid ? snapToGridOnPlane(raw, getSnapStep(), getPlaneInfo().axis) : null;
+
+        let particleP = null;
+        const particleHit = particlePoint ? {x: particlePoint.x, y: particlePoint.y, z: particlePoint.z} : null;
+        if (useParticle) {
+            if (particleHit) {
+                particleP = particleHit;
+            } else {
+                const cand = nearestPointCandidate(hitVec3, 0.35);
+                particleP = cand ? cand.point : null;
+            }
         }
 
-        // 只开粒子
-        if (!useGrid && useParticle) {
-            const cand = nearestPointXZCandidate(raw, 0.35);
-            return cand ? cand.point : raw; // ✅ 没粒子候选就不吸附
-        }
-
-        // ✅ 两个都开：比较“网格候选”和“粒子候选”，取更近
-        const gridP = snapToGrid(raw, getSnapStep());
-        const dGrid = dist2XZ(raw, gridP);
-
-        const cand = nearestPointXZCandidate(raw, 0.35);
-        const dParticle = cand ? cand.d2 : Infinity; // ✅ 没粒子候选 => 视为无穷远
-
-        return (dParticle <= dGrid) ? cand.point : gridP;
+        // 鼠标命中粒子时优先吸附粒子
+        if (useParticle && particleHit) return particleHit;
+        if (useParticle && !useGrid) return particleP || raw;
+        if (useGrid && useParticle) return particleP || gridP;
+        if (useGrid && !useParticle) return gridP;
+        return raw;
     }
 
+    function updatePickLineButtons() {
+        const label = getPlaneInfo().label;
+        if (btnPickLine) btnPickLine.textContent = `${label} 拾取直线`;
+        document.querySelectorAll("[data-pick-line-btn]").forEach((el) => {
+            el.textContent = `${label}拾取直线`;
+        });
+        if (btnPickPoint) btnPickPoint.textContent = `${label} 点拾取`;
+    }
+
+    function updateMirrorButtons() {
+        const label = getMirrorPlaneInfo().label;
+        document.querySelectorAll("[data-mirror-btn]").forEach((el) => {
+            el.title = `镜像复制（${label}）`;
+        });
+    }
+
+    function setSnapPlane(next) {
+        const key = SNAP_PLANES[next] ? next : "XZ";
+        snapPlane = key;
+        if (selSnapPlane && selSnapPlane.value !== key) selSnapPlane.value = key;
+        applyPickPlane();
+    }
+
+    function setMirrorPlane(next) {
+        const key = SNAP_PLANES[next] ? next : "XZ";
+        mirrorPlane = key;
+        if (selMirrorPlane && selMirrorPlane.value !== key) selMirrorPlane.value = key;
+        updateMirrorButtons();
+    }
+
+    function applyPickPlane() {
+        if (!pickPlane) pickPlane = new THREE.Plane();
+        const info = getPlaneInfo();
+        pickPlane.set(info.normal, 0);
+        updatePickLineButtons();
+        updateGridForPlane();
+        if (linePickMode) {
+            setLinePickStatus(`${info.label} 拾取模式[${linePickTargetLabel}]：请点第 1 点`);
+        }
+        if (pointPickMode) {
+            setPointPickStatus(`${info.label} 点拾取：左键确定，右键取消`);
+        }
+    }
 
     function initThree() {
         renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
@@ -1358,8 +1601,13 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.08;
+        // 旋转改为中键，其它操作保持（左键不再旋转）
+        controls.mouseButtons.LEFT = null;
+        controls.mouseButtons.MIDDLE = THREE.MOUSE.ROTATE;
+        controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
         axesHelper = new THREE.AxesHelper(5);
         scene.add(axesHelper);
+        buildAxisLabels();
 
         gridHelper = new THREE.GridHelper(256, 256, 0x223344, 0x223344);
         gridHelper.position.y = -0.01;
@@ -1372,7 +1620,10 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
 
         raycaster = new THREE.Raycaster();
         mouse = new THREE.Vector2();
-        pickPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+        pickPlane = new THREE.Plane(getPlaneInfo().normal.clone(), 0);
+        updatePickLineButtons();
+        updateGridForPlane();
+        updateMirrorButtons();
 
         window.addEventListener("resize", onResize);
         renderer.domElement.addEventListener("pointerdown", onPointerDown);
@@ -1380,14 +1631,22 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         renderer.domElement.addEventListener("pointerup", onPointerUp);
         renderer.domElement.addEventListener("click", onCanvasClick);
 
-        chkAxes.addEventListener("change", () => axesHelper.visible = chkAxes.checked);
-        chkGrid.addEventListener("change", () => gridHelper.visible = chkGrid.checked);
-        chkAutoFit.addEventListener("change", () => {
-            if (chkAutoFit.checked) {
-                needAutoFit = true;      // 打开时允许做一次自动对焦
-                rebuildPreviewAndKotlin(); // 触发一次（只会对焦一次）
-            }
+        chkAxes.addEventListener("change", () => {
+            axesHelper.visible = chkAxes.checked;
+            if (axisLabelGroup) axisLabelGroup.visible = chkAxes.checked;
         });
+        chkGrid.addEventListener("change", () => gridHelper.visible = chkGrid.checked);
+        if (btnResetCamera) {
+            btnResetCamera.addEventListener("click", () => resetCameraToPoints());
+        }
+        if (selSnapPlane) {
+            selSnapPlane.value = snapPlane;
+            selSnapPlane.addEventListener("change", () => setSnapPlane(selSnapPlane.value));
+        }
+        if (selMirrorPlane) {
+            selMirrorPlane.value = mirrorPlane;
+            selMirrorPlane.addEventListener("change", () => setMirrorPlane(selMirrorPlane.value));
+        }
         if (inpSnapStep) inpSnapStep.disabled = !(chkSnapGrid && chkSnapGrid.checked);
         chkSnapGrid?.addEventListener("change", () => {
             if (inpSnapStep) inpSnapStep.disabled = !chkSnapGrid.checked;
@@ -1418,6 +1677,22 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         renderer.setSize(threeHost.clientWidth, threeHost.clientHeight);
         camera.aspect = threeHost.clientWidth / threeHost.clientHeight;
         camera.updateProjectionMatrix();
+        layoutActionOverflow();
+    }
+
+    function resetCameraToPoints() {
+        if (!lastPoints || lastPoints.length === 0 || !camera || !controls) return;
+        const b = U.computeBounds(lastPoints);
+        const r = b.radius;
+        const c = b.center;
+        controls.target.set(c.x, c.y, c.z);
+
+        const dist = r * 2.4 + 2;
+        camera.position.set(c.x + dist, c.y + dist * 0.8, c.z + dist);
+        camera.near = Math.max(0.01, r / 100);
+        camera.far = Math.max(5000, r * 20);
+        camera.updateProjectionMatrix();
+        controls.update();
     }
 
     function setPoints(points) {
@@ -1433,7 +1708,6 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         lastPoints = points ? points.map(p => ({ x: p.x, y: p.y, z: p.z })) : [];
         if (!points || points.length === 0) {
             defaultColorBuf = null;
-            needAutoFit = true; // 清空后，下一次重新出现点时允许对焦一次
             return;
         }
 
@@ -1473,21 +1747,7 @@ import {OrbitControls} from "three/addons/controls/OrbitControls.js";
         // ✅ 根据当前聚焦的卡片，重新着色
         updateFocusColors();
 
-        if (chkAutoFit.checked && needAutoFit) {
-            const b = U.computeBounds(points);
-            const r = b.radius;
-            const c = b.center;
-            controls.target.set(c.x, c.y, c.z);
-
-            const dist = r * 2.4 + 2;
-            camera.position.set(c.x + dist, c.y + dist * 0.8, c.z + dist);
-            camera.near = Math.max(0.01, r / 100);
-            camera.far = Math.max(5000, r * 20);
-            camera.updateProjectionMatrix();
-            controls.update();
-
-            needAutoFit = false; // ✅ 之后改参数不再重置镜头
-        }
+        // 不自动重置镜头：由用户手动点击“重置镜头”
     }
 
     function updateFocusColors() {
@@ -1594,6 +1854,24 @@ function pickPointIndexFromEvent(ev) {
     return (idx === undefined || idx === null) ? null : idx;
 }
 
+function getParticleSnapFromEvent(ev) {
+    if (!(chkSnapParticle && chkSnapParticle.checked)) return null;
+    if (!pointsObj || !renderer || !camera || !raycaster) return null;
+    const rect = renderer.domElement.getBoundingClientRect();
+    mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -(((ev.clientY - rect.top) / rect.height) * 2 - 1);
+    raycaster.setFromCamera(mouse, camera);
+    // 吸附更宽松的阈值，优先捕获鼠标附近的粒子
+    raycaster.params.Points = raycaster.params.Points || {};
+    raycaster.params.Points.threshold = Math.max(0.12, (pointSize || 0.2) * 0.6);
+    const hits = raycaster.intersectObject(pointsObj, false);
+    if (!hits || hits.length === 0) return null;
+    const idx = hits[0].index;
+    if (idx === null || idx === undefined) return null;
+    if (!lastPoints || !lastPoints[idx]) return null;
+    return lastPoints[idx];
+}
+
 function scrollCardToTop(cardEl) {
     if (!cardEl || !elCardsRoot) return;
     const c = elCardsRoot;
@@ -1627,8 +1905,8 @@ function onCanvasClick(ev) {
         return;
     }
 
-    // XZ 拾取模式中由 onPointerDown 处理；此处不抢逻辑
-    if (linePickMode) return;
+    // 拾取模式中由 onPointerDown 处理；此处不抢逻辑
+    if (linePickMode || pointPickMode) return;
 
     // 防止因为 input blur 触发 focusout -> clearFocusedNodeIf（导致焦点先被清空，历史也变脏）
     suppressCardFocusOutClear = true;
@@ -1653,12 +1931,14 @@ function onCanvasClick(ev) {
 
     function animate() {
         requestAnimationFrame(animate);
+        applyArrowPan();
+        updateAxisLabelScale();
         controls.update();
         renderer.render(scene, camera);
     }
 
     // -------------------------
-    // line pick (XZ)
+    // line pick / point pick
     // -------------------------
     function setLinePickStatus(text) {
         statusLinePick.textContent = text;
@@ -1667,6 +1947,10 @@ function onCanvasClick(ev) {
 
     function hideLinePickStatus() {
         statusLinePick.classList.add("hidden");
+    }
+
+    function setPointPickStatus(text) {
+        setLinePickStatus(text);
     }
 
     function startLinePick(targetList, label, insertIndex = null) {
@@ -1682,7 +1966,7 @@ function onCanvasClick(ev) {
         linePickKeepFocusId = focusedNodeId;
         linePickMode = true;
         picked = [];
-        setLinePickStatus(`XZ 拾取模式[${linePickTargetLabel}]：请点第 1 点`);
+        setLinePickStatus(`${getPlaneInfo().label} 拾取模式[${linePickTargetLabel}]：请点第 1 点`);
     }
 
     function stopLinePick() {
@@ -1696,9 +1980,58 @@ function onCanvasClick(ev) {
         hideLinePickStatus();
     }
 
+    function startPointPick() {
+        const target = activeVecTarget || (document.activeElement && document.activeElement.__vecTarget);
+        if (!target) {
+            setPointPickStatus("请先聚焦到需要输入点的字段（axis/start/end）");
+            setTimeout(() => hideLinePickStatus(), 900);
+            return;
+        }
+        activeVecTarget = target;
+        if (linePickMode) stopLinePick();
+        _rClickT = 0;
+        pointPickTarget = target;
+        pointPickKeepFocusId = focusedNodeId;
+        pointPickMode = true;
+        ensureHoverMarker();
+        setHoverMarkerColor(0xffcc33);
+        hoverMarker.visible = true;
+        setPointPickStatus(`${getPlaneInfo().label} 点拾取：左键确定，右键取消`);
+    }
+
+    function stopPointPick() {
+        hideHoverMarker();
+        pointPickMode = false;
+        pointPickTarget = null;
+        pointPickKeepFocusId = null;
+        _rClickT = 0;
+        hideLinePickStatus();
+    }
+
+    function applyPointToTarget(p) {
+        if (!pointPickTarget) return;
+        const t = pointPickTarget;
+        historyCapture("pick_point");
+        t.obj[t.keys.x] = p.x;
+        t.obj[t.keys.y] = p.y;
+        t.obj[t.keys.z] = p.z;
+        if (t.inputs) {
+            t.inputs.x.value = String(p.x);
+            t.inputs.y.value = String(p.y);
+            t.inputs.z.value = String(p.z);
+        }
+        if (typeof t.onChange === "function") t.onChange();
+        if (t.inputs && t.inputs.x && t.inputs.x.isConnected === false) {
+            renderAll();
+        }
+        if (t.inputs && t.inputs.x) {
+            try { t.inputs.x.focus({ preventScroll: true }); } catch { try { t.inputs.x.focus(); } catch {} }
+        }
+    }
+
     function onPointerMove(ev) {
-        if (!linePickMode) return;
-        if (_rDown) {
+        if (!linePickMode && !pointPickMode) return;
+        if ((linePickMode || pointPickMode) && _rDown) {
             const d = Math.hypot(ev.clientX - _rDownX, ev.clientY - _rDownY);
             if (d > 6) _rMoved = true; // 视为拖动
             hideHoverMarker();
@@ -1710,11 +2043,16 @@ function onCanvasClick(ev) {
         mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
         mouse.y = -(((ev.clientY - rect.top) / rect.height) * 2 - 1);
         raycaster.setFromCamera(mouse, camera);
+        const particle = getParticleSnapFromEvent(ev);
 
         const hit = new THREE.Vector3();
         if (raycaster.ray.intersectPlane(pickPlane, hit)) {
-            const mapped = mapPickPoint(hit);
-            setHoverMarkerColor(colorForPickIndex((picked?.length || 0) >= 1 ? 1 : 0));
+            const mapped = mapPickPoint(hit, particle);
+            if (linePickMode) {
+                setHoverMarkerColor(colorForPickIndex((picked?.length || 0) >= 1 ? 1 : 0));
+            } else {
+                setHoverMarkerColor(0xffcc33);
+            }
             showHoverMarker(mapped);
         } else {
             hideHoverMarker();
@@ -1722,7 +2060,7 @@ function onCanvasClick(ev) {
     }
 
     function onPointerUp(ev) {
-        if (!linePickMode) return;
+        if (!linePickMode && !pointPickMode) return;
         if (!_rDown) return;
 
         _rDown = false;
@@ -1741,7 +2079,8 @@ function onCanvasClick(ev) {
 
         if (now - _rClickT < RDBL_MS && dist < RDBL_PX) {
             // ✅ 右键双击取消拾取
-            stopLinePick();   // 你已有：会 clearPickMarkers + hideHoverMarker
+            if (linePickMode) stopLinePick();
+            if (pointPickMode) stopPointPick();
             _rClickT = 0;
             return;
         }
@@ -1754,10 +2093,10 @@ function onCanvasClick(ev) {
 
     function onPointerDown(ev) {
         // 非拾取模式：点击/拖动预览主要用于 OrbitControls；选点聚焦由 click 事件处理
-        if (!linePickMode) return;
+        if (!linePickMode && !pointPickMode) return;
 
         // ✅ 右键 / Ctrl+Click：不选点，只进入“可能的右键双击取消”判定流程
-        if (isRightLike(ev)) {
+        if ((linePickMode || pointPickMode) && isRightLike(ev)) {
             _rDown = true;
             _rMoved = false;
             _rDownX = ev.clientX;
@@ -1775,10 +2114,17 @@ function onCanvasClick(ev) {
         mouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
         mouse.y = -(((ev.clientY - rect.top) / rect.height) * 2 - 1);
         raycaster.setFromCamera(mouse, camera);
+        const particle = getParticleSnapFromEvent(ev);
 
         const hit = new THREE.Vector3();
         if (raycaster.ray.intersectPlane(pickPlane, hit)) {
-            const mapped = mapPickPoint(hit);
+            const mapped = mapPickPoint(hit, particle);
+            if (pointPickMode) {
+                applyPointToTarget(mapped);
+                stopPointPick();
+                setTimeout(() => hideLinePickStatus(), 900);
+                return;
+            }
             const idx = picked.length; // 0=第一个点, 1=第二个点
             picked.push(mapped);
 
@@ -1787,7 +2133,7 @@ function onCanvasClick(ev) {
             showHoverMarker(mapped);
 
             if (picked.length === 1) {
-                setLinePickStatus(`XZ 拾取模式[${linePickTargetLabel}]：已选第 1 点：(${U.fmt(mapped.x)}, 0, ${U.fmt(mapped.z)})，再点第 2 点`);
+                setLinePickStatus(`${getPlaneInfo().label} 拾取模式[${linePickTargetLabel}]：已选第 1 点：(${U.fmt(mapped.x)}, ${U.fmt(mapped.y)}, ${U.fmt(mapped.z)})，再点第 2 点`);
             } else if (picked.length === 2) {
                 const a = picked[0], b = picked[1];
                 const list = linePickTargetList || state.root.children;
@@ -1795,7 +2141,7 @@ function onCanvasClick(ev) {
                 historyCapture("pick_line_xz");
 
                 const nn = makeNode("add_line", {
-                    params: {sx: a.x, sy: 0, sz: a.z, ex: b.x, ey: 0, ez: b.z, count: 30}
+                    params: {sx: a.x, sy: a.y, sz: a.z, ex: b.x, ey: b.y, ez: b.z, count: 30}
                 });
 
                 // ✅ 支持插入位置：如果是从 withBuilder 或某张卡片后进入拾取，则按 insertIndex 插入并可连续插入
@@ -1807,7 +2153,7 @@ function onCanvasClick(ev) {
                     linePickInsertIndex = at + 1;
                 }
 
-                setLinePickStatus(`XZ 拾取模式[${linePickTargetLabel}]：已添加 addLine（可在卡片里改 count）`);
+                setLinePickStatus(`${getPlaneInfo().label} 拾取模式[${linePickTargetLabel}]：已添加 addLine（可在卡片里改 count）`);
                 picked = [];
                 linePickMode = false;
                 // 退出拾取时清掉插入点；聚焦保留由 keepId 处理
@@ -1865,9 +2211,64 @@ function onCanvasClick(ev) {
     function iconBtn(text, onClick, danger = false) {
         const b = document.createElement("button");
         b.className = "iconbtn" + (danger ? " danger" : "");
+        b.classList.add("action-item");
         b.textContent = text;
         b.addEventListener("click", onClick);
         return b;
+    }
+
+    let moreMenuBound = false;
+    function ensureMoreMenu(actionsEl) {
+        let wrap = actionsEl.querySelector(".more-wrap");
+        if (wrap) return wrap;
+        wrap = document.createElement("div");
+        wrap.className = "more-wrap hidden";
+        const btn = document.createElement("button");
+        btn.className = "iconbtn more-btn";
+        btn.textContent = "⋯";
+        const menu = document.createElement("div");
+        menu.className = "more-menu";
+        wrap.appendChild(btn);
+        wrap.appendChild(menu);
+        actionsEl.appendChild(wrap);
+        btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            wrap.classList.toggle("open");
+        });
+        menu.addEventListener("click", (e) => e.stopPropagation());
+        if (!moreMenuBound) {
+            moreMenuBound = true;
+            document.addEventListener("click", () => {
+                document.querySelectorAll(".more-wrap.open").forEach((el) => el.classList.remove("open"));
+            });
+        }
+        return wrap;
+    }
+
+    function layoutActionOverflow() {
+        const cards = document.querySelectorAll(".card-actions");
+        cards.forEach((actionsEl) => {
+            const wrap = ensureMoreMenu(actionsEl);
+            const menu = wrap.querySelector(".more-menu");
+            wrap.classList.remove("open");
+
+            // move all items back to main row
+            Array.from(menu.children).forEach((item) => {
+                actionsEl.insertBefore(item, wrap);
+            });
+            menu.innerHTML = "";
+            wrap.classList.add("hidden");
+
+            if (actionsEl.scrollWidth <= actionsEl.clientWidth) return;
+            wrap.classList.remove("hidden");
+
+            let items = Array.from(actionsEl.querySelectorAll(".action-item")).filter((el) => !wrap.contains(el));
+            while (actionsEl.scrollWidth > actionsEl.clientWidth && items.length) {
+                const item = items.pop();
+                menu.insertBefore(item, menu.firstChild);
+            }
+            if (!menu.children.length) wrap.classList.add("hidden");
+        });
     }
 
     function row(label, editorEl) {
@@ -1925,7 +2326,7 @@ function onCanvasClick(ev) {
         return wrap;
     }
 
-    function makeVec3Editor(p, prefix, onChange) {
+    function makeVec3Editor(p, prefix, onChange, label = "") {
         const box = document.createElement("div");
         box.className = "mini";
         const ix = inputNum(p[prefix + "x"], v => {
@@ -1944,6 +2345,20 @@ function onCanvasClick(ev) {
         box.appendChild(ix);
         box.appendChild(iy);
         box.appendChild(iz);
+        const target = {
+            obj: p,
+            keys: {x: prefix + "x", y: prefix + "y", z: prefix + "z"},
+            inputs: {x: ix, y: iy, z: iz},
+            label: label || prefix || "vec3",
+            onChange
+        };
+        ix.__vecTarget = target;
+        iy.__vecTarget = target;
+        iz.__vecTarget = target;
+        const onFocus = () => { activeVecTarget = target; };
+        ix.addEventListener("focus", onFocus);
+        iy.addEventListener("focus", onFocus);
+        iz.addEventListener("focus", onFocus);
         return box;
     }
 
@@ -1980,6 +2395,46 @@ function onCanvasClick(ev) {
             historyCapture("drag_drop");
             const ok = moveNodeById(id, listRef, getIdx(), ownerNode);
             if (ok) renderAll();
+        });
+    }
+
+    // 用于 add_fourier_series 内部 term 卡片的拖拽排序
+    function setupDrag(handleEl, cardEl, listRef, getIdx, onRender) {
+        if (!handleEl || !cardEl || !Array.isArray(listRef)) return;
+        handleEl.setAttribute("draggable", "true");
+        handleEl.addEventListener("dragstart", (e) => {
+            draggingId = cardEl.dataset.id;
+            cardEl.classList.add("dragging");
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("text/plain", draggingId);
+        });
+        handleEl.addEventListener("dragend", () => {
+            draggingId = null;
+            cardEl.classList.remove("dragging");
+            cardEl.classList.remove("drag-over");
+        });
+
+        cardEl.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
+            cardEl.classList.add("drag-over");
+        });
+        cardEl.addEventListener("dragleave", () => cardEl.classList.remove("drag-over"));
+        cardEl.addEventListener("drop", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            cardEl.classList.remove("drag-over");
+            const id = e.dataTransfer.getData("text/plain") || draggingId;
+            if (!id) return;
+            const fromIdx = listRef.findIndex(it => it && it.id === id);
+            const toIdx = getIdx();
+            if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return;
+            historyCapture("drag_term");
+            const item = listRef.splice(fromIdx, 1)[0];
+            const insertAt = (fromIdx < toIdx) ? Math.max(0, toIdx - 1) : toIdx;
+            listRef.splice(insertAt, 0, item);
+            if (typeof onRender === "function") onRender();
+            else renderAll();
         });
     }
 
@@ -2152,6 +2607,15 @@ function onCanvasClick(ev) {
     const HOTKEY_ACTION_DEFS = [
         {id: "openPicker", title: "打开「添加卡片」", desc: "默认 W"},
         {id: "pickLineXZ", title: "进入 XZ 拾取直线", desc: "默认 Q"},
+        {id: "pickPoint", title: "点拾取（填充当前输入）", desc: "默认 E"},
+        {id: "snapPlaneXZ", title: "切换吸附平面：XZ", desc: "默认 1"},
+        {id: "snapPlaneXY", title: "切换吸附平面：XY", desc: "默认 2"},
+        {id: "snapPlaneZY", title: "切换吸附平面：ZY", desc: "默认 3"},
+        {id: "mirrorPlaneXZ", title: "切换镜像平面：XZ", desc: "默认 Shift+1"},
+        {id: "mirrorPlaneXY", title: "切换镜像平面：XY", desc: "默认 Shift+2"},
+        {id: "mirrorPlaneZY", title: "切换镜像平面：ZY", desc: "默认 Shift+3"},
+        {id: "copyFocused", title: "复制当前聚焦卡片", desc: "默认 Ctrl/Cmd + D"},
+        {id: "mirrorCopy", title: "镜像复制（直线/Offset）", desc: "默认 Ctrl/Cmd + Shift + M"},
         {id: "deleteFocused", title: "删除当前聚焦卡片", desc: "默认 Backspace"},
         {id: "undo", title: "撤销", desc: "默认 Ctrl/Cmd + Z"},
         {id: "redo", title: "恢复", desc: "默认 Ctrl/Cmd + Shift + Z"},
@@ -2305,6 +2769,7 @@ function beginHotkeyCapture(target) {
         // 不改变按钮原始文案，只更新 title 提示
         if (btnAddCard) btnAddCard.title = `快捷键：${hotkeyToHuman(hotkeys.actions.openPicker || "") || "未设置"}`;
         if (btnPickLine) btnPickLine.title = `快捷键：${hotkeyToHuman(hotkeys.actions.pickLineXZ || "") || "未设置"}`;
+        if (btnPickPoint) btnPickPoint.title = `快捷键：${hotkeyToHuman(hotkeys.actions.pickPoint || "") || "未设置"}`;
         if (btnHotkeys) btnHotkeys.title = "打开快捷键设置";
     }
 
@@ -2420,6 +2885,20 @@ function beginHotkeyCapture(target) {
             return;
         }
 
+        // Esc closes modal / hotkeys menu
+        if (e.code === "Escape") {
+            if (hkModal && !hkModal.classList.contains("hidden")) {
+                e.preventDefault();
+                hideHotkeysModal();
+                return;
+            }
+            if (modal && !modal.classList.contains("hidden")) {
+                e.preventDefault();
+                hideModal();
+                return;
+            }
+        }
+
         // 2) Undo/Redo should work everywhere (including inputs)
         if (hotkeyMatchEvent(e, hotkeys.actions.undo)) {
             e.preventDefault();
@@ -2429,6 +2908,13 @@ function beginHotkeyCapture(target) {
         if (hotkeyMatchEvent(e, hotkeys.actions.redo)) {
             e.preventDefault();
             historyRedo();
+            return;
+        }
+
+        // Arrow keys: pan like right-drag (avoid when typing)
+        if (isArrowKey(e.code) && !shouldIgnoreArrowPan()) {
+            e.preventDefault();
+            panKeyState[e.code] = true;
             return;
         }
 
@@ -2492,6 +2978,67 @@ function beginHotkeyCapture(target) {
             return;
         }
 
+        // 4.5) Pick point (fill focused vec3)
+        if (hotkeyMatchEvent(e, hotkeys.actions.pickPoint)) {
+            e.preventDefault();
+            if (modal && !modal.classList.contains("hidden")) hideModal();
+            if (hkModal && !hkModal.classList.contains("hidden")) hideHotkeysModal();
+            if (pointPickMode) stopPointPick();
+            else {
+                if (linePickMode) stopLinePick();
+                startPointPick();
+            }
+            return;
+        }
+
+        // 4.6) Snap plane quick switch
+        if (hotkeyMatchEvent(e, hotkeys.actions.snapPlaneXZ)) {
+            e.preventDefault();
+            setSnapPlane("XZ");
+            return;
+        }
+        if (hotkeyMatchEvent(e, hotkeys.actions.snapPlaneXY)) {
+            e.preventDefault();
+            setSnapPlane("XY");
+            return;
+        }
+        if (hotkeyMatchEvent(e, hotkeys.actions.snapPlaneZY)) {
+            e.preventDefault();
+            setSnapPlane("ZY");
+            return;
+        }
+
+        // 4.6.1) Mirror plane quick switch
+        if (hotkeyMatchEvent(e, hotkeys.actions.mirrorPlaneXZ)) {
+            e.preventDefault();
+            setMirrorPlane("XZ");
+            return;
+        }
+        if (hotkeyMatchEvent(e, hotkeys.actions.mirrorPlaneXY)) {
+            e.preventDefault();
+            setMirrorPlane("XY");
+            return;
+        }
+        if (hotkeyMatchEvent(e, hotkeys.actions.mirrorPlaneZY)) {
+            e.preventDefault();
+            setMirrorPlane("ZY");
+            return;
+        }
+
+        // 4.7) Copy focused / mirror copy
+        if (hotkeyMatchEvent(e, hotkeys.actions.copyFocused)) {
+            if ((modal && !modal.classList.contains("hidden")) || (hkModal && !hkModal.classList.contains("hidden"))) return;
+            e.preventDefault();
+            copyFocusedCard();
+            return;
+        }
+        if (hotkeyMatchEvent(e, hotkeys.actions.mirrorCopy)) {
+            if ((modal && !modal.classList.contains("hidden")) || (hkModal && !hkModal.classList.contains("hidden"))) return;
+            e.preventDefault();
+            mirrorCopyFocusedCard();
+            return;
+        }
+
         // 5) Add specific kind
         for (const [kind, hk] of Object.entries(hotkeys.kinds || {})) {
             if (!hk) continue;
@@ -2503,6 +3050,19 @@ function beginHotkeyCapture(target) {
             }
         }
     }, true);
+
+    window.addEventListener("keyup", (e) => {
+        if (isArrowKey(e.code)) {
+            panKeyState[e.code] = false;
+        }
+    }, true);
+
+    window.addEventListener("blur", () => {
+        panKeyState.ArrowUp = false;
+        panKeyState.ArrowDown = false;
+        panKeyState.ArrowLeft = false;
+        panKeyState.ArrowRight = false;
+    });
 
     // -------------------------
     // Cards render
@@ -2520,6 +3080,7 @@ function beginHotkeyCapture(target) {
         }
         // DOM 重建后重新标记聚焦高亮
         updateFocusCardUI();
+        requestAnimationFrame(() => layoutActionOverflow());
     }
 
 
@@ -2535,7 +3096,7 @@ function addQuickOffsetTo(list) {
 
         switch (node.kind) {
             case "axis":
-                body.appendChild(row("axis", makeVec3Editor(p, "", rebuildPreviewAndKotlin)));
+                body.appendChild(row("axis", makeVec3Editor(p, "", rebuildPreviewAndKotlin, "axis")));
                 break;
 
             case "scale":
@@ -2576,15 +3137,15 @@ function addQuickOffsetTo(list) {
                     renderAll();
                 })));
                 if (p.mode === "originEnd") {
-                    body.appendChild(row("origin", makeVec3Editor(p, "o", rebuildPreviewAndKotlin)));
-                    body.appendChild(row("end", makeVec3Editor(p, "e", rebuildPreviewAndKotlin)));
+                    body.appendChild(row("origin", makeVec3Editor(p, "o", rebuildPreviewAndKotlin, "origin")));
+                    body.appendChild(row("end", makeVec3Editor(p, "e", rebuildPreviewAndKotlin, "end")));
                 } else {
-                    body.appendChild(row("to", makeVec3Editor(p, "to", rebuildPreviewAndKotlin)));
+                    body.appendChild(row("to", makeVec3Editor(p, "to", rebuildPreviewAndKotlin, "to")));
                 }
                 break;
 
             case "add_point":
-                body.appendChild(row("point", makeVec3Editor(p, "", rebuildPreviewAndKotlin)));
+                body.appendChild(row("point", makeVec3Editor(p, "", rebuildPreviewAndKotlin, "point")));
                 break;
 
             case "add_circle":
@@ -2802,8 +3363,8 @@ function addQuickOffsetTo(list) {
                 break;
 
             case "add_line":
-                body.appendChild(row("start", makeVec3Editor(p, "s", rebuildPreviewAndKotlin)));
-                body.appendChild(row("end", makeVec3Editor(p, "e", rebuildPreviewAndKotlin)));
+                body.appendChild(row("start", makeVec3Editor(p, "s", rebuildPreviewAndKotlin, "start")));
+                body.appendChild(row("end", makeVec3Editor(p, "e", rebuildPreviewAndKotlin, "end")));
                 body.appendChild(row("count", inputNum(p.count, v => {
                     p.count = v;
                     rebuildPreviewAndKotlin();
@@ -2815,8 +3376,8 @@ function addQuickOffsetTo(list) {
                     p.useStart = v;
                     renderAll();
                 })));
-                if (p.useStart) body.appendChild(row("start", makeVec3Editor(p, "s", rebuildPreviewAndKotlin)));
-                body.appendChild(row("end(偏移)", makeVec3Editor(p, "e", rebuildPreviewAndKotlin)));
+                if (p.useStart) body.appendChild(row("start", makeVec3Editor(p, "s", rebuildPreviewAndKotlin, "start")));
+                body.appendChild(row("end(偏移)", makeVec3Editor(p, "e", rebuildPreviewAndKotlin, "end")));
                 body.appendChild(row("count", inputNum(p.count, v => {
                     p.count = v;
                     rebuildPreviewAndKotlin();
@@ -2840,8 +3401,8 @@ function addQuickOffsetTo(list) {
                     p.useStart = v;
                     renderAll();
                 })));
-                if (p.useStart) body.appendChild(row("start", makeVec3Editor(p, "s", rebuildPreviewAndKotlin)));
-                body.appendChild(row("end", makeVec3Editor(p, "e", rebuildPreviewAndKotlin)));
+                if (p.useStart) body.appendChild(row("start", makeVec3Editor(p, "s", rebuildPreviewAndKotlin, "start")));
+                body.appendChild(row("end", makeVec3Editor(p, "e", rebuildPreviewAndKotlin, "end")));
                 body.appendChild(row("counts", inputNum(p.counts, v => {
                     p.counts = v;
                     rebuildPreviewAndKotlin();
@@ -2969,7 +3530,31 @@ function addQuickOffsetTo(list) {
                     const pickBtn = document.createElement("button");
                     pickBtn.className = "btn small";
                     pickBtn.textContent = "XZ拾取直线";
-                    pickBtn.addEventListener("click", () => startLinePick(node.children, "子Builder", (node.children || []).length));
+                    pickBtn.dataset.pickLineBtn = "1";
+                    pickBtn.addEventListener("click", () => {
+                        if (linePickMode) stopLinePick();
+                        else {
+                            if (pointPickMode) stopPointPick();
+                            startLinePick(node.children, "子Builder", (node.children || []).length);
+                        }
+                    });
+
+                    const exportBtn = document.createElement("button");
+                    exportBtn.className = "btn small";
+                    exportBtn.textContent = "导出JSON";
+                    exportBtn.addEventListener("click", () => {
+                        const out = {root: {id: "root", kind: "ROOT", children: deepClone(node.children || [])}};
+                        downloadText("withBuilder.json", JSON.stringify(out, null, 2), "application/json");
+                    });
+
+                    const importBtn = document.createElement("button");
+                    importBtn.className = "btn small";
+                    importBtn.textContent = "导入JSON";
+                    importBtn.addEventListener("click", () => {
+                        if (!fileBuilderJson) return;
+                        builderJsonTargetNode = node;
+                        fileBuilderJson.click();
+                    });
 
                     const clearBtn = document.createElement("button");
                     clearBtn.className = "btn small danger";
@@ -2984,6 +3569,8 @@ function addQuickOffsetTo(list) {
                     actions.appendChild(addBtn);
                     actions.appendChild(offBtn);
                     actions.appendChild(pickBtn);
+                    actions.appendChild(exportBtn);
+                    actions.appendChild(importBtn);
                     actions.appendChild(clearBtn);
 
                     head.appendChild(title);
@@ -3243,22 +3830,40 @@ function addQuickOffsetTo(list) {
 
 
         // ✅ 快捷添加：在当前卡片下方插入（若选中 withBuilder 卡片则插入到子Builder）
-        actions.appendChild(iconBtn("＋", () => {
+        const addBtn = iconBtn("＋", () => {
             if (node.kind === "with_builder") {
                 openModal(node.children, (node.children || []).length, "子Builder", node.id);
             } else {
                 openModal(siblings, idx + 1, ownerLabel);
             }
-        }));
-        actions.appendChild(iconBtn("↑", () => {
+        });
+        addBtn.title = "在下方新增";
+        actions.appendChild(addBtn);
+
+        const toTopBtn = iconBtn("⇡", () => {
             if (idx > 0) {
+                historyCapture("move_top");
+                const n = siblings.splice(idx, 1)[0];
+                siblings.unshift(n);
+                renderAll();
+            }
+        });
+        toTopBtn.title = "置顶";
+        actions.appendChild(toTopBtn);
+
+        const upBtn = iconBtn("↑", () => {
+            if (idx > 0) {
+                historyCapture("move_up");
                 const t = siblings[idx - 1];
                 siblings[idx - 1] = siblings[idx];
                 siblings[idx] = t;
                 renderAll();
             }
-        }));
-        actions.appendChild(iconBtn("↓", () => {
+        });
+        upBtn.title = "上移";
+        actions.appendChild(upBtn);
+
+        const downBtn = iconBtn("↓", () => {
             if (idx < siblings.length - 1) {
                 historyCapture("move_down");
                 const t = siblings[idx + 1];
@@ -3266,9 +3871,44 @@ function addQuickOffsetTo(list) {
                 siblings[idx] = t;
                 renderAll();
             }
-        }));
+        });
+        downBtn.title = "下移";
+        actions.appendChild(downBtn);
+
+        const toBottomBtn = iconBtn("⇣", () => {
+            if (idx < siblings.length - 1) {
+                historyCapture("move_bottom");
+                const n = siblings.splice(idx, 1)[0];
+                siblings.push(n);
+                renderAll();
+            }
+        });
+        toBottomBtn.title = "置底";
+        actions.appendChild(toBottomBtn);
+
+        if (node.kind === "add_line" || node.kind === "points_on_each_offset") {
+            const mirrorBtn = iconBtn("⇋", () => {
+                const cloned = mirrorCopyNode(node, mirrorPlane);
+                if (!cloned) return;
+                historyCapture("mirror_copy");
+                siblings.splice(idx + 1, 0, cloned);
+                renderAll();
+                requestAnimationFrame(() => {
+                    const el = elCardsRoot.querySelector(`.card[data-id="${cloned.id}"]`);
+                    if (el) {
+                        try { el.focus(); } catch {}
+                        try { el.scrollIntoView({ block: "nearest" }); } catch {}
+                        setFocusedNode(cloned.id, false);
+                    }
+                });
+            });
+            mirrorBtn.dataset.mirrorBtn = "1";
+            mirrorBtn.title = `镜像复制（${getMirrorPlaneInfo().label}）`;
+            actions.appendChild(mirrorBtn);
+        }
+
         // ✅ 复制卡片：在当前卡片下方插入一张一模一样的（含子卡片/terms）
-        actions.appendChild(iconBtn("⧉", () => {
+        const copyBtn = iconBtn("⧉", () => {
             historyCapture("copy_card");
             const cloned = cloneNodeDeep(node);
             siblings.splice(idx + 1, 0, cloned);
@@ -3282,8 +3922,11 @@ function addQuickOffsetTo(list) {
                     try { el.scrollIntoView({ block: "nearest" }); } catch {}
                 }
             });
-        }));
-        actions.appendChild(iconBtn("🗑", () => {
+        });
+        copyBtn.title = "复制";
+        actions.appendChild(copyBtn);
+
+        const delBtn = iconBtn("🗑", () => {
             historyCapture("delete_card");
             siblings.splice(idx, 1);
             // 如果删的是当前聚焦卡片：把焦点挪到更合理的位置（不额外写历史）
@@ -3293,7 +3936,9 @@ function addQuickOffsetTo(list) {
             }
             ensureAxisEverywhere();
             renderAll();
-        }, true));
+        }, true);
+        delBtn.title = "删除";
+        actions.appendChild(delBtn);
 
         head.appendChild(title);
         head.appendChild(actions);
@@ -3387,8 +4032,17 @@ function addQuickOffsetTo(list) {
     btnPickLine.addEventListener("click", () => {
         if (linePickMode) stopLinePick();
         else {
+            if (pointPickMode) stopPointPick();
             const ctx = getInsertContextFromFocus();
             startLinePick(ctx.list, ctx.label, ctx.insertIndex);
+        }
+    });
+    btnPickPoint && btnPickPoint.addEventListener("click", () => {
+        if (pointPickMode) {
+            stopPointPick();
+        } else {
+            if (linePickMode) stopLinePick();
+            startPointPick();
         }
     });
 
@@ -3435,6 +4089,27 @@ function addQuickOffsetTo(list) {
             alert("JSON 解析失败：" + e.message);
         } finally {
             fileJson.value = "";
+        }
+    });
+
+    fileBuilderJson && fileBuilderJson.addEventListener("change", async () => {
+        const f = fileBuilderJson.files && fileBuilderJson.files[0];
+        if (!f) return;
+        const target = builderJsonTargetNode;
+        try {
+            const text = await f.text();
+            const obj = JSON.parse(text);
+            if (!obj || !obj.root || !Array.isArray(obj.root.children)) throw new Error("invalid json");
+            if (!target) throw new Error("no target");
+            historyCapture("import_with_builder_json");
+            target.children = obj.root.children;
+            ensureAxisInList(target.children);
+            renderAll();
+        } catch (e) {
+            alert("JSON 解析失败：" + e.message);
+        } finally {
+            builderJsonTargetNode = null;
+            fileBuilderJson.value = "";
         }
     });
 

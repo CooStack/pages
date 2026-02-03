@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="zh-CN">
 <head>
     <meta charset="utf-8" />
@@ -10,6 +10,7 @@
 <div id="app">
     <header class="topbar">
         <div class="topbar-left">
+            <a class="btn" href="./index.html">返回主页</a>
             <div class="brand">
                 <div class="brand-title">PointsBuilder 可视化构建器</div>
                 <div class="brand-sub">卡片编辑 / Three.js 预览 / Kotlin 导出</div>
@@ -20,8 +21,10 @@
             <button id="btnAddCard" class="btn primary">添加卡片</button>
             <button id="btnQuickOffset" class="btn">快捷 Offset</button>
             <button id="btnPickLine" class="btn">XZ 拾取直线</button>
+            <button id="btnPickPoint" class="btn">点拾取</button>
             <button id="btnHotkeys" class="btn">快捷键</button>
             <button id="btnFullscreen" class="btn">预览全屏</button>
+            <button id="btnResetCamera" class="btn">重置镜头</button>
 
             <span class="sep"></span>
 
@@ -34,6 +37,7 @@
             <button id="btnSaveJson" class="btn">导出 JSON</button>
             <button id="btnLoadJson" class="btn">导入 JSON</button>
             <input id="fileJson" type="file" accept="application/json" hidden />
+            <input id="fileBuilderJson" type="file" accept="application/json" hidden />
             <button id="btnReset" class="btn danger">重置</button>
         </div>
     </header>
@@ -51,7 +55,7 @@
             <div class="viewer-hud">
                 <div class="hud-left">
                     <div id="statusLinePick" class="badge hidden"></div>
-                    <div id="statusPoints" class="badge">点数：0</div>
+                    <div id="statusPoints" class="badge">点数：</div>
                 </div>
                 <div class="hud-right">
                     <label class="chk">
@@ -63,10 +67,6 @@
                         <span>网格</span>
                     </label>
                     <label class="chk">
-                        <input id="chkAutoFit" type="checkbox" checked />
-                        <span>自动缩放</span>
-                    </label>
-                    <label class="chk">
                         <input id="chkSnapGrid" type="checkbox" checked/>
                         吸附网格
                         <span style="opacity:.7; margin-left:6px;">步长</span>
@@ -76,6 +76,22 @@
                     <label class="chk">
                         <input id="chkSnapParticle" type="checkbox" checked>
                         吸附粒子
+                    </label>
+                    <label class="chk">
+                        <span style="opacity:.7;">吸附平面</span>
+                        <select id="selSnapPlane" class="input plane-select">
+                            <option value="XZ">XZ</option>
+                            <option value="XY">XY</option>
+                            <option value="ZY">ZY</option>
+                        </select>
+                    </label>
+                    <label class="chk">
+                        <span style="opacity:.7;">镜像平面</span>
+                        <select id="selMirrorPlane" class="input plane-select">
+                            <option value="XZ">XZ</option>
+                            <option value="XY">XY</option>
+                            <option value="ZY">ZY</option>
+                        </select>
                     </label>
                     <label class="chk">
                         <span style="opacity:.7;">粒子大小</span>
@@ -99,7 +115,7 @@
             </div>
 
             <div class="panel-footnote">
-                角度输入为“度”，导出会转换为“弧度表达式”：<code>x*PI</code>（x 已计算）。
+                角度输入为“度”，导出会转换为“弧度表达式”：<code>x*PI</code>（已计算）。
             </div>
         </aside>
     </main>
@@ -128,7 +144,7 @@
             <button id="btnCloseHotkeys" class="btn icon">✕</button>
         </div>
         <div class="modal-body">
-            <div id="hkHint" style="margin:0 0 10px; opacity:.8; font-size:12px;">点击「设置」后按下你想要的按键（Esc 取消，Backspace 清空）。</div>
+            <div id="hkHint" style="margin:0 0 10px; opacity:.8; font-size:12px;">点击“设置”后按下你想要的按键（Esc 取消，Backspace 清空）。</div>
             <div id="hkList" class="hk-list"></div>
         </div>
         <div class="modal-foot" style="display:flex; gap:8px; align-items:center;">
@@ -143,7 +159,7 @@
 
 </div>
 
-<!-- 固定到 r149：避免 r150+ 的 deprecated 提示，同时保持纯 script 引入可 file:// 直接运行 -->
+<!-- 固定到 r149：避开 r150+ 的 deprecated 提示，同时保持纯 script 引入可 file:// 直接运行 -->
 <script type="importmap">
     {
       "imports": {

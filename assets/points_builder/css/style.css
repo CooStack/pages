@@ -59,6 +59,12 @@ body {
     backdrop-filter: blur(10px);
 }
 
+.topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
 .brand {
     display: flex;
     flex-direction: column;
@@ -94,6 +100,7 @@ body {
     border: 1px solid var(--line2);
     background: rgba(255, 255, 255, .03);
     color: var(--text);
+    text-decoration: none;
     height: 34px;
     padding: 0 10px;
     border-radius: 10px;
@@ -404,9 +411,18 @@ body {
     align-items: center;
     gap: 6px;
     margin-left: 6px;
-    /* ✅ 按钮多时换行，不再把标题挤没 */
-    flex-wrap: wrap;
+    /* ✅ 按钮多时放入“更多”菜单 */
+    flex-wrap: nowrap;
+    overflow: hidden;
     justify-content: flex-end;
+    min-width: 0;
+}
+
+.card-actions .iconbtn,
+.card-actions .btn,
+.card-actions .more-wrap {
+    flex: 0 0 auto;
+    flex-shrink: 0;
 }
 
 /* ✅ 子卡片更紧凑：嵌套层级多时减少“按钮拥挤” */
@@ -458,6 +474,59 @@ body {
 
 .iconbtn.danger:hover {
     background: rgba(255, 78, 78, .14)
+}
+
+.plane-select {
+    height: 24px;
+    padding: 0 6px;
+    font-size: 12px;
+    border-radius: 999px;
+    min-width: 84px;
+    width: 84px;
+    flex: 0 0 auto;
+    text-align: center;
+    text-align-last: center;
+    box-sizing: border-box;
+}
+
+.more-wrap {
+    position: relative;
+    flex: 0 0 auto;
+}
+
+.more-wrap.hidden {
+    display: none;
+}
+
+.more-btn {
+    font-weight: 800;
+}
+
+.more-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    min-width: 160px;
+    max-width: 260px;
+    background: linear-gradient(180deg, rgba(20, 26, 56, .92), rgba(0, 0, 0, .75));
+    border: 1px solid var(--line2);
+    border-radius: 12px;
+    padding: 6px;
+    box-shadow: var(--shadow2);
+    display: none;
+    z-index: 5;
+}
+
+.more-wrap.open .more-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.more-menu .iconbtn,
+.more-menu .btn {
+    width: 100%;
+    justify-content: flex-start;
 }
 
 .card-body {

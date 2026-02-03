@@ -284,6 +284,7 @@ const kTrailingLambda = (expr, fallback = "this.pos") => {
     const state = {
         commands: [],
         playing: true,
+        autoPaused: false,
         ticksPerSecond: 20,
         fullscreen: false,
         emitter: {
@@ -1545,50 +1546,52 @@ const kTrailingLambda = (expr, fallback = "this.pos") => {
         state.particle.colorEnd = ($("#colEnd").val() || "#d04dff").trim();
     }
 
+    const FIELD_CN = {
+        strength: "强度",
+        frequency: "频率",
+        speed: "速度",
+        affectY: "影响Y轴",
+        clampSpeed: "速度上限",
+        useLifeCurve: "使用生命曲线",
+        damping: "阻尼",
+        linear: "线性阻力",
+        minSpeed: "最小速度",
+        amplitude: "振幅",
+        timeScale: "时间缩放",
+        phaseOffset: "相位偏移",
+        worldOffsetX: "世界偏移X",
+        worldOffsetY: "世界偏移Y",
+        worldOffsetZ: "世界偏移Z",
+        targetMode: "目标模式",
+        targetX: "目标X",
+        targetY: "目标Y",
+        targetZ: "目标Z",
+        targetExpr: "目标表达式",
+        centerMode: "中心模式",
+        centerX: "中心X",
+        centerY: "中心Y",
+        centerZ: "中心Z",
+        centerExpr: "中心表达式",
+        axisX: "轴X",
+        axisY: "轴Y",
+        axisZ: "轴Z",
+        radius: "半径",
+        angularSpeed: "角速度",
+        radialCorrect: "径向修正",
+        minDistance: "最小距离",
+        mode: "模式",
+        maxRadialStep: "最大径向步长",
+        swirlStrength: "旋转强度",
+        radialPull: "径向吸引",
+        axialLift: "轴向提升",
+        range: "范围",
+        falloffPower: "衰减指数",
+        emitterRef: "发射器引用",
+    };
+
     function humanFieldName(k) {
-        const map = {
-            strength: "strength",
-            frequency: "frequency",
-            speed: "speed",
-            affectY: "affectY",
-            clampSpeed: "clampSpeed",
-            useLifeCurve: "useLifeCurve",
-            damping: "damping",
-            linear: "linear",
-            minSpeed: "minSpeed",
-            amplitude: "amplitude",
-            timeScale: "timeScale",
-            phaseOffset: "phaseOffset",
-            worldOffsetX: "worldOffset.x",
-            worldOffsetY: "worldOffset.y",
-            worldOffsetZ: "worldOffset.z",
-            targetMode: "target 模式",
-            targetX: "target.x",
-            targetY: "target.y",
-            targetZ: "target.z",
-            targetExpr: "target 表达式",
-            centerMode: "center 模式",
-            centerX: "center.x",
-            centerY: "center.y",
-            centerZ: "center.z",
-            centerExpr: "center 表达式",
-            axisX: "axis.x",
-            axisY: "axis.y",
-            axisZ: "axis.z",
-            radius: "radius",
-            angularSpeed: "angularSpeed",
-            radialCorrect: "radialCorrect",
-            minDistance: "minDistance",
-            mode: "mode",
-            maxRadialStep: "maxRadialStep",
-            swirlStrength: "swirlStrength",
-            radialPull: "radialPull（向 center 吸入）",
-            axialLift: "axialLift",
-            range: "range",
-            falloffPower: "falloffPower",
-            emitterRef: "emitter 引用(空=默认)",
-        };
-        return map[k] || k;
+        const cn = FIELD_CN[k];
+        return cn ? `${k} (${cn})` : k;
     }
 
     function escapeHtml(s) {
@@ -1904,10 +1907,12 @@ const kTrailingLambda = (expr, fallback = "this.pos") => {
 
         $("#btnPlay").on("click", () => {
             state.playing = true;
+            state.autoPaused = false;
             toast("预览：播放");
         });
         $("#btnPause").on("click", () => {
             state.playing = false;
+            state.autoPaused = false;
             toast("预览：暂停");
         });
         $("#btnClear").on("click", () => {
@@ -1976,6 +1981,27 @@ $("#btnFull, #btnFullTop").on("click", () => setFullscreen(true));
                 e.preventDefault();
                 cardHistory.redoOnce();
             }
+        });
+
+        // 离开窗口/切到后台自动暂停，返回时如果之前在播放则继续
+        const autoPause = () => {
+            if (state.playing) {
+                state.playing = false;
+                state.autoPaused = true;
+            }
+        };
+        const autoResume = () => {
+            if (state.autoPaused) {
+                state.playing = true;
+                state.autoPaused = false;
+                sim.lastTime = performance.now();
+            }
+        };
+        window.addEventListener("blur", autoPause);
+        window.addEventListener("focus", autoResume);
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "hidden") autoPause();
+            if (document.visibilityState === "visible") autoResume();
         });
     }
 
