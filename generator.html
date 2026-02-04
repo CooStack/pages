@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
@@ -17,7 +17,7 @@
     <link rel="stylesheet" href="./assets/emitter_generator/css/style.css" />
 </head>
 
-  <body>
+  <body data-theme="dark-1">
     <div class="app">
       <header class="topbar">
         <div class="brand">
@@ -36,9 +36,17 @@
           <button class="btn" id="btnPlay">▶ 预览</button>
           <button class="btn" id="btnPause">⏸ 暂停</button>
           <button class="btn" id="btnClear">🧹 清空粒子</button>
-          <button class="btn" id="btnTheme" title="切换亮/暗主题">
-            🌙 暗色
-          </button>
+          <div class="theme-switch">
+            <span>主题</span>
+            <select id="themeSelect" class="theme-select" title="Alt+[ / Alt+] 切换">
+              <option value="dark-1">夜岚</option>
+              <option value="dark-2">深潮</option>
+              <option value="dark-3">焰砂</option>
+              <option value="light-1">雾蓝</option>
+              <option value="light-2">杏露</option>
+              <option value="light-3">薄荷</option>
+            </select>
+          </div>
           <button class="btn" id="btnUndo" title="撤回 (Ctrl+Z / ⌘Z)">↶ 撤回</button>
           <button class="btn" id="btnRedo" title="重做 (Ctrl+Y / ⌘⇧Z)">↷ 重做</button>
           <div class="sep"></div>

@@ -1,21 +1,24 @@
 :root {
-        --bg: rgb(30, 30, 30);
-        --panel: rgb(52, 59, 77);
-        --panel-soft: rgb(46, 43, 43);
-        --panel-head: rgb(62, 57, 54);
-        --text: #e9eef8;
-        --muted: rgba(233, 238, 248, 0.72);
+        --bg: #0e1218;
+        --panel: #151b24;
+        --panel-soft: #121822;
+        --panel-head: #1b2230;
+        --text: #e8eef7;
+        --muted: rgba(169, 183, 204, 0.72);
         --line: rgba(255, 255, 255, 0.1);
-        --line2: rgba(255, 255, 255, 0.14);
-        --accent: #6aa8ff;
-        --accent2: #35d38b;
-        --danger: #ff5a6f;
-        --btn-bg: rgba(46, 43, 43, 0.72);
-        --btn-bg-hover: rgba(46, 43, 43, 0.88);
-        --input-bg: rgba(30, 30, 30, 0.62);
-        --input-bg-focus: rgba(30, 30, 30, 0.74);
-        --shadow: 0 12px 30px rgba(0, 0, 0, 0.38);
-        --shadow2: 0 18px 60px rgba(0, 0, 0, 0.52);
+        --line2: rgba(255, 255, 255, 0.16);
+        --accent: #6fa8ff;
+        --accent2: #7ad9ff;
+        --danger: #ff6b6b;
+        --btn-bg: rgba(18, 24, 34, 0.75);
+        --btn-bg-hover: rgba(18, 24, 34, 0.92);
+        --input-bg: rgba(15, 19, 27, 0.7);
+        --input-bg-focus: rgba(15, 19, 27, 0.82);
+        --input-option-bg: #101521;
+        --input-option-text: #e8eef7;
+        --input-arrow: rgba(232, 238, 247, 0.9);
+        --shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+        --shadow2: 0 18px 60px rgba(0, 0, 0, 0.6);
         --radius: 14px;
         --radius2: 18px;
         --mono:
@@ -26,24 +29,152 @@
           "Helvetica Neue", Arial, "Noto Sans", "PingFang SC",
           "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
       }
+      body[data-theme^="dark"] {
+        color-scheme: dark;
+        --input-text-focus: rgba(255, 255, 255, 0.96);
+      }
+      body[data-theme^="light"] {
+        color-scheme: light;
+        --input-text-focus: rgba(24, 34, 48, 0.92);
+      }
+
+      body[data-theme="dark-1"] {
+        --bg: #0e1218;
+        --panel: #151b24;
+        --panel-soft: #121822;
+        --panel-head: #1b2230;
+        --text: #e8eef7;
+        --muted: rgba(169, 183, 204, 0.72);
+        --line: rgba(255, 255, 255, 0.1);
+        --line2: rgba(255, 255, 255, 0.16);
+        --accent: #6fa8ff;
+        --accent2: #7ad9ff;
+        --danger: #ff6b6b;
+        --btn-bg: rgba(18, 24, 34, 0.75);
+        --btn-bg-hover: rgba(18, 24, 34, 0.92);
+        --input-bg: rgba(15, 19, 27, 0.7);
+        --input-bg-focus: rgba(15, 19, 27, 0.82);
+        --input-option-bg: #101521;
+        --input-option-text: #e8eef7;
+        --input-arrow: rgba(232, 238, 247, 0.9);
+        --shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+        --shadow2: 0 18px 60px rgba(0, 0, 0, 0.6);
+      }
+
+      body[data-theme="dark-2"] {
+        --bg: #0b1413;
+        --panel: #101b1a;
+        --panel-soft: #0e1716;
+        --panel-head: #162423;
+        --text: #e8faf6;
+        --muted: rgba(190, 220, 212, 0.72);
+        --line: rgba(255, 255, 255, 0.08);
+        --line2: rgba(255, 255, 255, 0.13);
+        --accent: #32c7a2;
+        --accent2: #62e0c7;
+        --danger: #ff6b7a;
+        --btn-bg: rgba(12, 18, 18, 0.72);
+        --btn-bg-hover: rgba(12, 18, 18, 0.9);
+        --input-bg: rgba(10, 18, 18, 0.7);
+        --input-bg-focus: rgba(10, 18, 18, 0.82);
+        --input-option-bg: #0c1716;
+        --input-option-text: #e8faf6;
+        --input-arrow: rgba(232, 250, 246, 0.9);
+        --shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+        --shadow2: 0 18px 60px rgba(0, 0, 0, 0.55);
+      }
+
+      body[data-theme="dark-3"] {
+        --bg: #17120f;
+        --panel: #211915;
+        --panel-soft: #1c1512;
+        --panel-head: #281d18;
+        --text: #fff3e4;
+        --muted: rgba(230, 205, 180, 0.7);
+        --line: rgba(255, 225, 200, 0.1);
+        --line2: rgba(255, 225, 200, 0.16);
+        --accent: #ff9a5f;
+        --accent2: #ffd08a;
+        --danger: #ff6a5f;
+        --btn-bg: rgba(32, 24, 20, 0.75);
+        --btn-bg-hover: rgba(32, 24, 20, 0.92);
+        --input-bg: rgba(18, 12, 10, 0.75);
+        --input-bg-focus: rgba(18, 12, 10, 0.86);
+        --input-option-bg: #201512;
+        --input-option-text: #fff3e4;
+        --input-arrow: rgba(255, 243, 228, 0.9);
+        --shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+        --shadow2: 0 18px 60px rgba(0, 0, 0, 0.6);
+      }
+
+      body[data-theme="light-1"],
       body.theme-light {
-        --bg: #f6f8fc;
-        --panel: #ffffff;
-        --panel-soft: #fbfcff;
-        --panel-head: #f1f5ff;
-        --text: #0f172a;
-        --muted: #5b6b85;
-        --line: rgba(15, 23, 42, 0.1);
-        --line2: rgba(15, 23, 42, 0.14);
-        --accent: #2f76ff;
-        --accent2: #22c55e;
-        --danger: #ef4444;
+        --bg: #e4f3fe;
+        --panel: #f7fbff;
+        --panel-soft: #eef6ff;
+        --panel-head: #eaf2ff;
+        --text: #1b2d45;
+        --muted: #4c6486;
+        --line: rgba(60, 90, 140, 0.12);
+        --line2: rgba(60, 90, 140, 0.2);
+        --accent: #559be8;
+        --accent2: #f0d7d8;
+        --danger: #e85d5d;
         --btn-bg: rgba(255, 255, 255, 0.92);
         --btn-bg-hover: #ffffff;
-        --input-bg: rgba(248, 250, 255, 0.95);
-        --input-bg-focus: #ffffff;
+        --input-bg: rgba(255, 255, 255, 0.88);
+        --input-bg-focus: rgba(255, 255, 255, 0.92);
+        --input-option-bg: #ffffff;
+        --input-option-text: #1b2d45;
+        --input-arrow: rgba(27, 45, 69, 0.95);
         --shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
         --shadow2: 0 18px 60px rgba(15, 23, 42, 0.12);
+      }
+
+      body[data-theme="light-2"] {
+        --bg: #fff6ee;
+        --panel: #fffdfb;
+        --panel-soft: #fff7f1;
+        --panel-head: #fff0e6;
+        --text: #3d2b21;
+        --muted: #7a5b4a;
+        --line: rgba(60, 40, 30, 0.1);
+        --line2: rgba(60, 40, 30, 0.16);
+        --accent: #ff8a3d;
+        --accent2: #ffb36b;
+        --danger: #e85d5d;
+        --btn-bg: rgba(255, 255, 255, 0.92);
+        --btn-bg-hover: #ffffff;
+        --input-bg: rgba(255, 247, 240, 0.95);
+        --input-bg-focus: #ffffff;
+        --input-option-bg: #ffffff;
+        --input-option-text: #3d2b21;
+        --input-arrow: rgba(61, 43, 33, 0.95);
+        --shadow: 0 10px 26px rgba(61, 43, 33, 0.08);
+        --shadow2: 0 18px 60px rgba(61, 43, 33, 0.12);
+      }
+
+      body[data-theme="light-3"] {
+        --bg: #f1fbf7;
+        --panel: #ffffff;
+        --panel-soft: #f4fbf8;
+        --panel-head: #eaf7f1;
+        --text: #0e1f1a;
+        --muted: #3f5c50;
+        --line: rgba(14, 40, 30, 0.1);
+        --line2: rgba(14, 40, 30, 0.16);
+        --accent: #2dbd8f;
+        --accent2: #6ad6b2;
+        --danger: #e24d5b;
+        --btn-bg: rgba(255, 255, 255, 0.92);
+        --btn-bg-hover: #ffffff;
+        --input-bg: rgba(230, 246, 240, 0.95);
+        --input-bg-focus: #ffffff;
+        --input-option-bg: #ffffff;
+        --input-option-text: #0e1f1a;
+        --input-arrow: rgba(14, 31, 26, 0.95);
+        --shadow: 0 10px 26px rgba(14, 31, 26, 0.08);
+        --shadow2: 0 18px 60px rgba(14, 31, 26, 0.12);
       }
       * {
         box-sizing: border-box;
@@ -85,6 +216,8 @@
         border-bottom: 1px solid var(--line);
         background: color-mix(in srgb, var(--bg) 55%, transparent);
         backdrop-filter: blur(10px);
+        gap: 12px;
+        flex-wrap: wrap;
       }
       .brand {
         display: flex;
@@ -113,6 +246,51 @@
         align-items: center;
         gap: 8px;
         flex-wrap: wrap;
+        row-gap: 6px;
+        flex: 1 1 auto;
+        min-width: 0;
+        justify-content: flex-end;
+      }
+      .theme-switch {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 8px;
+        height: 42px;
+        border-radius: 12px;
+        border: 1px solid var(--line2);
+        background: var(--btn-bg);
+        box-shadow: 0 8px 18px color-mix(in srgb, #000 18%, transparent);
+        flex: 0 1 220px;
+        min-width: 190px;
+        max-width: 260px;
+      }
+      .theme-switch span {
+        font-size: 12px;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      .theme-select {
+        height: 34px;
+        min-height: 34px;
+        line-height: 34px;
+        min-width: 0;
+        width: 100%;
+        flex: 1 1 auto;
+        padding: 0 32px 0 12px;
+        font-size: 12px;
+        color: var(--text);
+        background-color: var(--input-bg);
+        text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+      }
+      body[data-theme^="light"] .theme-select {
+        text-shadow: none;
+      }
+      @media (max-width: 1280px) {
+        .theme-switch {
+          flex: 1 1 220px;
+          justify-content: flex-end;
+        }
       }
       .sep {
         width: 1px;
@@ -177,18 +355,15 @@
         min-height: 0;
       }
       .panel {
-        background: linear-gradient(
-          180deg,
-          color-mix(in srgb, var(--panel) 92%, transparent),
-          color-mix(in srgb, var(--panel-soft) 92%, transparent)
-        );
-        border: 1px solid var(--line);
+        background: color-mix(in srgb, var(--panel) 78%, transparent);
+        border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
         border-radius: var(--radius2);
-        box-shadow: var(--shadow);
+        box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.06);
         min-height: 0;
         overflow: hidden;
         display: flex;
         flex-direction: column;
+        backdrop-filter: blur(14px) saturate(1.2);
       }
       .panel.left,
       .panel.right {
@@ -199,11 +374,7 @@
         padding: 12px 14px;
         font-weight: 900;
         border-bottom: 1px solid var(--line);
-        background: linear-gradient(
-          180deg,
-          color-mix(in srgb, var(--panel-head) 70%, transparent),
-          color-mix(in srgb, var(--panel-soft) 35%, transparent)
-        );
+        background: color-mix(in srgb, var(--panel-head) 72%, transparent);
       }
       .panel-subtitle {
         padding: 12px 14px 6px 14px;
@@ -234,6 +405,7 @@
       }
       .field input,
       .field select,
+      .theme-select,
       textarea {
         width: 100%;
         padding: 10px 10px;
@@ -244,12 +416,90 @@
         outline: none;
         min-width: 0;
       }
+      .theme-switch .theme-select {
+        height: 34px;
+        min-height: 34px;
+        line-height: 34px;
+        padding: 0 32px 0 12px;
+        color: var(--text) !important;
+      }
       .field input:focus,
-      .field select:focus,
       textarea:focus {
         border-color: color-mix(in srgb, var(--accent) 60%, var(--line2));
         box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
         background: var(--input-bg-focus);
+      }
+      .field select,
+      .add-row select,
+      .cmdGrid select,
+      .theme-select {
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        padding-right: 28px;
+        border-radius: 12px;
+        background-color: var(--input-bg);
+        background-image:
+          linear-gradient(
+            45deg,
+            transparent 50%,
+            var(--input-arrow) 50%
+          ),
+          linear-gradient(
+            135deg,
+            var(--input-arrow) 50%,
+            transparent 50%
+          );
+        background-position:
+          calc(100% - 16px) 50%,
+          calc(100% - 10px) 50%;
+        background-size:
+          6px 6px,
+          6px 6px;
+        background-repeat: no-repeat;
+        box-shadow:
+          0 10px 22px color-mix(in srgb, #000 22%, transparent),
+          inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent);
+        transition: border-color 0.16s ease, box-shadow 0.18s ease, background 0.18s ease, transform 0.12s ease, filter 0.16s ease;
+      }
+      .field select:hover,
+      .add-row select:hover,
+      .cmdGrid select:hover,
+      .theme-select:hover {
+        border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+      }
+      .field select:focus,
+      .add-row select:focus,
+      .cmdGrid select:focus,
+      .theme-select:focus {
+        background: var(--input-bg);
+        color: var(--input-text-focus);
+        box-shadow:
+          0 0 0 2px color-mix(in srgb, var(--accent) 60%, transparent),
+          0 10px 24px color-mix(in srgb, #000 22%, transparent),
+          inset 0 1px 0 color-mix(in srgb, #fff 12%, transparent);
+        transform: translateY(-1px) scale(1.03);
+        filter: brightness(1.05);
+        animation: select-pop 160ms ease;
+      }
+      .field select:active,
+      .add-row select:active,
+      .cmdGrid select:active,
+      .theme-select:active {
+        transform: translateY(0) scale(.99);
+      }
+      @keyframes select-pop {
+        0% { transform: translateY(0) scale(1); }
+        60% { transform: translateY(-1px) scale(1.04); }
+        100% { transform: translateY(-1px) scale(1.03); }
+      }
+      select option,
+      select optgroup {
+        background: var(--input-option-bg);
+        color: var(--input-option-text);
+      }
+      input:not([type="checkbox"]):not([type="radio"]):not([type="range"]) {
+        border-radius: 12px;
       }
       .vec3Row {
         display: flex;
@@ -396,6 +646,7 @@
       .add-row select {
         flex: 1;
         height: 40px;
+        padding-left: 16px;
       }
       .add-row .btn {
         height: 40px;
@@ -408,15 +659,13 @@
         gap: 12px;
       }
       .cmdCard {
-        border: 1px solid var(--line2);
-        background: linear-gradient(
-          180deg,
-          color-mix(in srgb, var(--panel) 92%, transparent),
-          color-mix(in srgb, var(--panel-soft) 92%, transparent)
-        );
+        border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+        background: color-mix(in srgb, var(--panel) 78%, transparent);
         border-radius: 18px;
         overflow: hidden;
-        box-shadow: 0 10px 26px color-mix(in srgb, #000 18%, transparent);
+        box-shadow: 0 10px 26px color-mix(in srgb, #000 22%, transparent),
+          inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        backdrop-filter: blur(12px) saturate(1.15);
       }
       .cmdCard:hover {
         border-color: color-mix(in srgb, var(--accent) 30%, var(--line2));
@@ -477,6 +726,12 @@
         grid-template-columns: 1fr 1fr;
         gap: 10px;
       }
+      .cmdGrid select {
+        padding: 12px 36px 12px 18px;
+      }
+      .cmdGrid input {
+        padding-left: 18px;
+      }
       .cmdGrid .field label {
         font-size: 11.5px;
         color: var(--muted);
@@ -496,15 +751,23 @@
         width: 44px;
         height: 24px;
         appearance: none;
-        background: color-mix(in srgb, var(--text) 14%, transparent);
+        background: linear-gradient(
+          180deg,
+          color-mix(in srgb, #fff 8%, transparent),
+          color-mix(in srgb, var(--text) 12%, transparent)
+        );
         border-radius: 999px;
         position: relative;
         outline: none;
         cursor: pointer;
         border: 1px solid var(--line2);
+        box-shadow:
+          0 8px 18px color-mix(in srgb, #000 20%, transparent),
+          inset 0 1px 0 color-mix(in srgb, #fff 10%, transparent);
         transition:
           background 0.14s ease,
-          border-color 0.14s ease;
+          border-color 0.14s ease,
+          box-shadow 0.14s ease;
       }
       .switch input::after {
         content: "";
@@ -519,7 +782,11 @@
         transition: transform 0.14s ease;
       }
       .switch input:checked {
-        background: color-mix(in srgb, var(--accent) 35%, transparent);
+        background: linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--accent) 55%, transparent),
+          color-mix(in srgb, var(--accent) 28%, transparent)
+        );
         border-color: color-mix(in srgb, var(--accent) 35%, var(--line2));
       }
       .switch input:checked::after {
@@ -535,17 +802,20 @@
       }
       .viewport-wrap.isFull {
         position: fixed;
-        inset: 10px;
+        inset: 0;
         z-index: 999999;
-        padding: 14px;
-        border-radius: 18px;
+        padding: 0;
+        border-radius: 0;
+        width: 100vw;
+        height: 100vh;
         background: color-mix(in srgb, var(--bg) 55%, transparent);
         border: 1px solid var(--line2);
         box-shadow: var(--shadow2);
         backdrop-filter: blur(10px);
       }
       .viewport-wrap.isFull .viewport {
-        height: calc(100vh - 90px);
+        height: 100vh;
+        border-radius: 0;
       }
       .footer {
         padding: 10px 14px;
@@ -584,11 +854,12 @@
 }
 .modal{
   width: min(520px, calc(100vw - 26px));
-  background: color-mix(in srgb, var(--panel) 88%, black);
-  border: 1px solid var(--line2);
+  background: color-mix(in srgb, var(--panel) 78%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
   border-radius: var(--radius2);
-  box-shadow: var(--shadow2);
+  box-shadow: var(--shadow2), inset 0 1px 0 rgba(255,255,255,.06);
   overflow: hidden;
+  backdrop-filter: blur(16px) saturate(1.2);
 }
 .modal .modal-head{
   padding: 14px 16px;

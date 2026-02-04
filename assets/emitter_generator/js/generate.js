@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+﻿import * as THREE from 'three';
 (() => {
     // ---------- utils ----------
     const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
@@ -1905,12 +1905,21 @@ const kTrailingLambda = (expr, fallback = "this.pos") => {
     function setFullscreen(on) {
         state.fullscreen = !!on;
         const $wrap = $("#viewportWrap");
+        const wrapEl = $wrap && $wrap.length ? $wrap.get(0) : null;
         if (state.fullscreen) {
             $wrap.addClass("isFull");
             $("#btnExitFull").show();
+            document.body.classList.add("fullscreen-lock");
+            if (wrapEl && wrapEl.requestFullscreen && !document.fullscreenElement) {
+                wrapEl.requestFullscreen().catch(() => {});
+            }
         } else {
             $wrap.removeClass("isFull");
             $("#btnExitFull").hide();
+            document.body.classList.remove("fullscreen-lock");
+            if (document.fullscreenElement && document.exitFullscreen) {
+                document.exitFullscreen().catch(() => {});
+            }
         }
         // next frame resize
         requestAnimationFrame(() => resizeRenderer());
@@ -1966,6 +1975,10 @@ const kTrailingLambda = (expr, fallback = "this.pos") => {
             copyKotlin();
         });
 
+        $("#btnUndo").on("click", () => cardHistory.undoOnce());
+        $("#btnRedo").on("click", () => cardHistory.redoOnce());
+
+
         
 
         $("#btnExportJson").on("click", () => exportStateJson());
@@ -1983,8 +1996,13 @@ const kTrailingLambda = (expr, fallback = "this.pos") => {
                 toast("导入失败");
             }
         });
-$("#btnFull, #btnFullTop").on("click", () => setFullscreen(true));
+        $("#btnFull, #btnFullTop").on("click", () => setFullscreen(true));
         $("#btnExitFull").on("click", () => setFullscreen(false));
+        document.addEventListener("fullscreenchange", () => {
+            if (!document.fullscreenElement && state.fullscreen) {
+                setFullscreen(false);
+            }
+        });
 
         // 快捷键：撤回/重做（不在输入框时） + ESC 退出全屏
         window.addEventListener("keydown", (e) => {
@@ -2041,24 +2059,61 @@ $("#btnFull, #btnFullTop").on("click", () => setFullscreen(true));
         });
     }
 
-    function applyTheme(isLight) {
-        $("body").toggleClass("theme-light", !!isLight);
-        const lightNow = $("body").hasClass("theme-light");
-        // 按钮文案：暗色默认（🌙 暗色），切到亮色显示 ☀ 亮色
-        $("#btnTheme").text(lightNow ? "☀ 亮色" : "🌙 暗色");
-        $("#btnTheme").attr("title", lightNow ? "切换到暗色主题" : "切换到亮色主题");
+    const THEMES = [
+        { id: "dark-1", label: "夜岚" },
+        { id: "dark-2", label: "深潮" },
+        { id: "dark-3", label: "焰砂" },
+        { id: "light-1", label: "雾蓝" },
+        { id: "light-2", label: "杏露" },
+        { id: "light-3", label: "薄荷" }
+    ];
+    const THEME_ORDER = THEMES.map(t => t.id);
+    const THEME_KEY = "pe_theme_v2";
+    const hasTheme = (id) => THEMES.some(t => t.id === id);
+    const normalizeTheme = (id) => {
+        if (id === "dark") return "dark-1";
+        if (id === "light") return "light-1";
+        return hasTheme(id) ? id : "dark-1";
+    };
+    function applyTheme(themeId) {
+        const finalId = normalizeTheme(themeId);
+        document.body.setAttribute("data-theme", finalId);
+        const sel = document.getElementById("themeSelect");
+        if (sel && sel.value !== finalId) sel.value = finalId;
     }
 
     function initThemeToggle() {
-        // 默认暗色：localStorage 没值时就是 false
-        const saved = localStorage.getItem("pe_theme");
-        const isLight = saved === "light";
-        applyTheme(isLight);
+        const saved = localStorage.getItem(THEME_KEY) || localStorage.getItem("pe_theme") || "";
+        const initial = normalizeTheme(saved || "dark-1");
+        applyTheme(initial);
+        localStorage.setItem(THEME_KEY, initial);
 
-        $("#btnTheme").on("click", () => {
-            const nextIsLight = !$("body").hasClass("theme-light");
-            applyTheme(nextIsLight);
-            localStorage.setItem("pe_theme", nextIsLight ? "light" : "dark");
+        const sel = document.getElementById("themeSelect");
+        if (!sel) return;
+        sel.addEventListener("change", () => {
+            const next = normalizeTheme(sel.value);
+            applyTheme(next);
+            localStorage.setItem(THEME_KEY, next);
+        });
+    }
+
+    function cycleTheme(dir) {
+        const cur = document.body.getAttribute("data-theme") || "dark-1";
+        const idx = Math.max(0, THEME_ORDER.indexOf(cur));
+        const next = THEME_ORDER[(idx + dir + THEME_ORDER.length) % THEME_ORDER.length];
+        applyTheme(next);
+        localStorage.setItem(THEME_KEY, next);
+    }
+
+    function bindThemeHotkeys() {
+        window.addEventListener("keydown", (e) => {
+            if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+            if (e.key !== "[" && e.key !== "]") return;
+            const el = document.activeElement;
+            const isEditable = !!el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/i.test(el.tagName));
+            if (isEditable) return;
+            e.preventDefault();
+            cycleTheme(e.key === "]" ? 1 : -1);
         });
     }
 
@@ -2079,6 +2134,7 @@ $("#btnFull, #btnFullTop").on("click", () => setFullscreen(true));
         initThree();
         animate();
         initThemeToggle();
+        bindThemeHotkeys();
     }
 
     $(document).ready(() => {
@@ -2086,3 +2142,4 @@ $("#btnFull, #btnFullTop").on("click", () => setFullscreen(true));
         boot();
     });
 })();
+

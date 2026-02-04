@@ -91,6 +91,7 @@ import {
     const chkAxes = document.getElementById("chkAxes");
     const chkGrid = document.getElementById("chkGrid");
     const btnResetCamera = document.getElementById("btnResetCamera");
+    const themeSelect = document.getElementById("themeSelect");
     const chkSnapGrid = document.getElementById("chkSnapGrid");
     const chkSnapParticle = document.getElementById("chkSnapParticle");
     const selSnapPlane = document.getElementById("selSnapPlane");
@@ -110,6 +111,91 @@ import {
     // helpers
     // -------------------------
     const uid = () => (Math.random().toString(16).slice(2) + Date.now().toString(16)).slice(0, 16);
+
+    const THEMES = [
+        { id: "dark-1", label: "夜岚" },
+        { id: "dark-2", label: "深潮" },
+        { id: "dark-3", label: "焰砂" },
+        { id: "light-1", label: "雾蓝" },
+        { id: "light-2", label: "杏露" },
+        { id: "light-3", label: "薄荷" }
+    ];
+    const THEME_ORDER = THEMES.map(t => t.id);
+    const THEME_KEY = "pb_theme_v2";
+    const hasTheme = (id) => THEMES.some(t => t.id === id);
+    const normalizeTheme = (id) => {
+        if (id === "dark") return "dark-1";
+        if (id === "light") return "light-1";
+        return hasTheme(id) ? id : "dark-1";
+    };
+    const readCssColor = (name, fallback) => {
+        if (!document || !document.body) return fallback;
+        const v = getComputedStyle(document.body).getPropertyValue(name).trim();
+        return v || fallback;
+    };
+    const applySceneTheme = () => {
+        const gridColor = readCssColor("--grid-color", "#223344");
+        const pointColor = readCssColor("--point-color", "#ffffff");
+        const focusColor = readCssColor("--point-focus", "#ffcc33");
+
+        defaultPointColor.set(pointColor);
+        focusPointColor.set(focusColor);
+
+        if (gridHelper && scene) {
+            const wasVisible = gridHelper.visible;
+            try {
+                scene.remove(gridHelper);
+                gridHelper.geometry && gridHelper.geometry.dispose();
+                if (Array.isArray(gridHelper.material)) {
+                    gridHelper.material.forEach(m => m && m.dispose && m.dispose());
+                } else if (gridHelper.material && gridHelper.material.dispose) {
+                    gridHelper.material.dispose();
+                }
+            } catch {}
+            gridHelper = new THREE.GridHelper(256, 256, gridColor, gridColor);
+            gridHelper.position.y = -0.01;
+            gridHelper.visible = wasVisible;
+            scene.add(gridHelper);
+            updateGridForPlane();
+        }
+        refreshPointBaseColors();
+    };
+    const applyTheme = (id) => {
+        const finalId = normalizeTheme(id);
+        document.body.setAttribute("data-theme", finalId);
+        if (themeSelect && themeSelect.value !== finalId) themeSelect.value = finalId;
+        applySceneTheme();
+    };
+    const initTheme = () => {
+        const saved = localStorage.getItem(THEME_KEY) || "";
+        const initial = normalizeTheme(saved || "dark-1");
+        applyTheme(initial);
+        localStorage.setItem(THEME_KEY, initial);
+        if (!themeSelect) return;
+        themeSelect.addEventListener("change", () => {
+            const next = normalizeTheme(themeSelect.value);
+            applyTheme(next);
+            localStorage.setItem(THEME_KEY, next);
+        });
+    };
+    const cycleTheme = (dir) => {
+        const cur = document.body.getAttribute("data-theme") || "dark-1";
+        const idx = Math.max(0, THEME_ORDER.indexOf(cur));
+        const next = THEME_ORDER[(idx + dir + THEME_ORDER.length) % THEME_ORDER.length];
+        applyTheme(next);
+        localStorage.setItem(THEME_KEY, next);
+    };
+    const bindThemeHotkeys = () => {
+        window.addEventListener("keydown", (e) => {
+            if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+            if (e.key !== "[" && e.key !== "]") return;
+            const el = document.activeElement;
+            const isEditable = !!el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/i.test(el.tagName));
+            if (isEditable) return;
+            e.preventDefault();
+            cycleTheme(e.key === "]" ? 1 : -1);
+        });
+    };
 
     function num(v) {
         const x = Number(v);
@@ -161,6 +247,10 @@ import {
     // Project name / Kotlin ending
     // -------------------------
     let projectName = loadProjectName();
+    if (!projectName) {
+        projectName = "shape";
+        saveProjectName(projectName);
+    }
 
     function getProjectBaseName() {
         return sanitizeFileBase(projectName || "");
@@ -985,6 +1075,8 @@ import {
     let defaultColorBuf = null;        // Float32Array：默认颜色缓存（与 position 等长）
     const DEFAULT_POINT_HEX = 0xffffff;
     const FOCUS_POINT_HEX = 0xffcc33;
+    const defaultPointColor = new THREE.Color(DEFAULT_POINT_HEX);
+    const focusPointColor = new THREE.Color(FOCUS_POINT_HEX);
 
     let pickMarkers = [];
     let pointSize = 0.2;     // ✅ 粒子大小（PointsMaterial.size）
@@ -1364,6 +1456,7 @@ import {
         gridHelper = new THREE.GridHelper(256, 256, 0x223344, 0x223344);
         gridHelper.position.y = -0.01;
         scene.add(gridHelper);
+        applySceneTheme();
 
         scene.add(new THREE.AmbientLight(0xffffff, 0.8));
         const dir = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -1499,7 +1592,7 @@ import {
         geom.setAttribute("position", new THREE.BufferAttribute(pos, 3));
 
         // color（默认色 + 聚焦色）
-        const c0 = new THREE.Color(DEFAULT_POINT_HEX);
+        const c0 = defaultPointColor;
         defaultColorBuf = new Float32Array(points.length * 3);
         for (let i = 0; i < points.length; i++) {
             defaultColorBuf[i * 3 + 0] = c0.r;
@@ -1526,6 +1619,17 @@ import {
         // 不自动重置镜头：由用户手动点击“重置镜头”
     }
 
+    function refreshPointBaseColors() {
+        if (!pointsObj || !defaultColorBuf) return;
+        const c0 = defaultPointColor;
+        for (let i = 0; i < defaultColorBuf.length; i += 3) {
+            defaultColorBuf[i + 0] = c0.r;
+            defaultColorBuf[i + 1] = c0.g;
+            defaultColorBuf[i + 2] = c0.b;
+        }
+        updateFocusColors();
+    }
+
     function updateFocusColors() {
         if (!pointsObj) return;
         const g = pointsObj.geometry;
@@ -1538,7 +1642,7 @@ import {
         // 再打聚焦色
         const seg = focusedNodeId ? nodePointSegments.get(focusedNodeId) : null;
         if (seg && seg.end > seg.start) {
-            const c1 = new THREE.Color(FOCUS_POINT_HEX);
+            const c1 = focusPointColor;
             for (let i = seg.start; i < seg.end; i++) {
                 const k = i * 3;
                 attr.array[k + 0] = c1.r;
@@ -2444,6 +2548,7 @@ function onCanvasClick(ev) {
         setBuilderJsonTargetNode: (node) => { builderJsonTargetNode = node; },
         getLinePickMode: () => linePickMode,
         getPointPickMode: () => pointPickMode,
+        syncCardCollapseUI,
         isCollapseAllActive,
         getCollapseScope,
         collapseAllInScope,
@@ -2523,13 +2628,11 @@ function onCanvasClick(ev) {
         setTimeout(() => URL.revokeObjectURL(a.href), 200);
     }
 
-    btnExportKotlin.addEventListener("click", doExportKotlin);
-    btnExportKotlin2.addEventListener("click", doExportKotlin);
+    btnExportKotlin?.addEventListener("click", doExportKotlin);
+    btnExportKotlin2?.addEventListener("click", doExportKotlin);
     btnToggleKotlin && btnToggleKotlin.addEventListener("click", () => setKotlinHidden(!isKotlinHidden()));
-    btnCopyKotlin.addEventListener("click", doCopyKotlin);
-    btnCopyKotlin2.addEventListener("click", doCopyKotlin);
-    btnDownloadKotlin && btnDownloadKotlin.addEventListener("click", doDownloadKotlin);
-    btnDownloadKotlin2 && btnDownloadKotlin2.addEventListener("click", doDownloadKotlin);
+    btnCopyKotlin?.addEventListener("click", doCopyKotlin);
+    btnCopyKotlin2?.addEventListener("click", doCopyKotlin);
     if (selKotlinEnd) {
         selKotlinEnd.value = kotlinEndMode;
         selKotlinEnd.addEventListener("change", () => {
@@ -2660,6 +2763,8 @@ function onCanvasClick(ev) {
     // -------------------------
     // Boot
     // -------------------------
+    initTheme();
+    bindThemeHotkeys();
     applyLayoutState(false);
     bindResizers();
     updateKotlinToggleText();

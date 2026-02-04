@@ -201,6 +201,22 @@ export function initCardSystem(ctx = {}) {
         return b;
     }
 
+    function syncCollapseUIForList(list) {
+        if (typeof ctx.syncCardCollapseUI !== "function") return false;
+        const visit = (arr) => {
+            const nodes = arr || [];
+            for (const n of nodes) {
+                if (!n) continue;
+                if (n.id) ctx.syncCardCollapseUI(n.id);
+                if (isBuilderContainerKind(n.kind) && Array.isArray(n.children)) {
+                    visit(n.children);
+                }
+            }
+        };
+        visit(list);
+        return true;
+    }
+
     function makeCollapseAllButtons(scopeId, listGetter, small = true) {
         const collapseBtn = document.createElement("button");
         collapseBtn.className = small ? "btn small" : "btn";
@@ -208,7 +224,7 @@ export function initCardSystem(ctx = {}) {
         collapseBtn.addEventListener("click", () => {
             const list = (typeof listGetter === "function") ? listGetter() : [];
             if (typeof ctx.collapseAllInScope === "function") ctx.collapseAllInScope(scopeId, list);
-            renderAll();
+            if (!syncCollapseUIForList(list)) renderAll();
         });
 
         const expandBtn = document.createElement("button");
@@ -217,7 +233,7 @@ export function initCardSystem(ctx = {}) {
         expandBtn.addEventListener("click", () => {
             const list = (typeof listGetter === "function") ? listGetter() : [];
             if (typeof ctx.expandAllInScope === "function") ctx.expandAllInScope(scopeId, list);
-            renderAll();
+            if (!syncCollapseUIForList(list)) renderAll();
         });
 
         return { collapseBtn, expandBtn };
@@ -1151,22 +1167,6 @@ export function initCardSystem(ctx = {}) {
                     p.count = v;
                     rebuildPreviewAndKotlin();
                 })));
-                body.appendChild(row("seed", checkbox(p.seedEnabled, v => {
-                    p.seedEnabled = v;
-                    renderAll();
-                })));
-                if (p.seedEnabled) body.appendChild(row("seed值", inputNum(p.seed, v => {
-                    p.seed = v;
-                    rebuildPreviewAndKotlin();
-                })));
-                body.appendChild(row("输出形式", select(
-                    [["direct3", "it.add(x,y,z)"], ["newRel", "it.add(RelativeLocation)"], ["valRel", "val rel; it.add(rel)"]],
-                    p.kotlinMode,
-                    v => {
-                        p.kotlinMode = v;
-                        rebuildPreviewAndKotlin();
-                    }
-                )));
                 break;
 
             case "add_bezier":

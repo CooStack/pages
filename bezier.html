@@ -274,6 +274,11 @@
         appearance: none;
         -webkit-appearance: none;
         -moz-appearance: none;
+        box-shadow:
+          0 10px 24px rgba(0, 0, 0, 0.35),
+          inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        transition: border-color 0.15s ease, box-shadow 0.15s ease,
+          background 0.15s ease;
 
         /* 下拉箭头（用渐变画一个小三角） */
         background-image:
@@ -308,7 +313,9 @@
       }
       select:focus {
         border-color: rgba(71, 162, 237, 0.85);
-        box-shadow: 0 0 0 3px rgba(71, 162, 237, 0.16);
+        box-shadow: 0 0 0 3px rgba(71, 162, 237, 0.16),
+          0 10px 24px rgba(0, 0, 0, 0.35),
+          inset 0 1px 0 rgba(255, 255, 255, 0.12);
       }
 
       /* ✅ 下拉列表里的 option 颜色（很多浏览器会吃这个） */
@@ -370,7 +377,67 @@
         cursor: pointer;
       }
       .toggle input {
-        transform: translateY(1px);
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        width: 16px;
+        height: 16px;
+        border-radius: 5px;
+        border: 1px solid var(--line2);
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.08),
+          rgba(0, 0, 0, 0.3)
+        );
+        box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35),
+          inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        display: inline-grid;
+        place-items: center;
+        cursor: pointer;
+        margin: 0;
+        transition: transform 0.08s ease, border-color 0.15s ease,
+          background 0.15s ease, box-shadow 0.15s ease;
+      }
+      .toggle input::after {
+        content: "";
+        width: 8px;
+        height: 4px;
+        border-left: 2px solid rgba(255, 255, 255, 0.92);
+        border-bottom: 2px solid rgba(255, 255, 255, 0.92);
+        transform: rotate(-45deg) scale(0.7);
+        opacity: 0;
+        transition: opacity 0.12s ease, transform 0.12s ease;
+      }
+      .toggle input:hover {
+        border-color: rgba(71, 162, 237, 0.55);
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.12),
+          rgba(0, 0, 0, 0.24)
+        );
+      }
+      .toggle input:active {
+        transform: scale(0.96);
+      }
+      .toggle input:checked {
+        border-color: rgba(71, 162, 237, 0.7);
+        background: linear-gradient(
+          180deg,
+          rgba(71, 162, 237, 0.6),
+          rgba(71, 162, 237, 0.22)
+        );
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35),
+          inset 0 1px 0 rgba(255, 255, 255, 0.16);
+      }
+      .toggle input:checked::after {
+        opacity: 1;
+        transform: rotate(-45deg) scale(1);
+      }
+      .toggle input:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(71, 162, 237, 0.2),
+          0 10px 20px rgba(0, 0, 0, 0.35),
+          inset 0 1px 0 rgba(255, 255, 255, 0.12);
       }
       .toggle span {
         color: var(--muted2);

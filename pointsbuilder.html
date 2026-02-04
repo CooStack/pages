@@ -6,7 +6,7 @@
     <title>PointsBuilder 可视化构建器</title>
     <link rel="stylesheet" href="./assets/points_builder/css/style.css" />
 </head>
-<body>
+<body data-theme="dark-1">
 <div id="app">
     <header class="topbar">
         <div class="topbar-left">
@@ -25,12 +25,17 @@
             <button id="btnHotkeys" class="btn">快捷键</button>
             <button id="btnFullscreen" class="btn">预览全屏</button>
             <button id="btnResetCamera" class="btn">重置镜头</button>
-
-            <span class="sep"></span>
-
-            <button id="btnExportKotlin" class="btn primary">生成 Kotlin</button>
-            <button id="btnCopyKotlin" class="btn">复制 Kotlin</button>
-            <button id="btnDownloadKotlin" class="btn">下载 Kotlin</button>
+            <div class="theme-switch">
+                <span>主题</span>
+                <select id="themeSelect" class="input theme-select" title="Alt+[ / Alt+] 切换">
+                    <option value="dark-1">夜岚</option>
+                    <option value="dark-2">深潮</option>
+                    <option value="dark-3">焰砂</option>
+                    <option value="light-1">雾蓝</option>
+                    <option value="light-2">杏露</option>
+                    <option value="light-3">薄荷</option>
+                </select>
+            </div>
 
             <span class="sep"></span>
 
@@ -129,7 +134,6 @@
             <div class="panel-actions">
                 <button id="btnCopyKotlin2" class="btn">复制</button>
                 <button id="btnExportKotlin2" class="btn primary">重新生成</button>
-                <button id="btnDownloadKotlin2" class="btn">下载 .kt</button>
             </div>
 
             <div class="panel-footnote">

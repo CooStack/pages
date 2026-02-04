@@ -26,10 +26,10 @@
         downloadText
     } = ctx || {};
 
-    const HOTKEY_STORAGE_KEY = "pb_hotkeys_v1";
+    const HOTKEY_STORAGE_KEY = "pb_hotkeys_v2";
 
     const DEFAULT_HOTKEYS = {
-        version: 1,
+        version: 2,
         actions: {
             openPicker: "KeyW",          // W
             pickLineXZ: "KeyQ",          // Q
@@ -37,12 +37,12 @@
             toggleFullscreen: "KeyF",    // F
             resetCamera: "KeyR",         // R
             importJson: "Mod+KeyO",      // Ctrl/Cmd + O
-            snapPlaneXZ: "Digit1",       // 1
-            snapPlaneXY: "Digit2",       // 2
-            snapPlaneZY: "Digit3",       // 3
-            mirrorPlaneXZ: "Shift+Digit1", // Shift + 1
-            mirrorPlaneXY: "Shift+Digit2", // Shift + 2
-            mirrorPlaneZY: "Shift+Digit3", // Shift + 3
+            snapPlaneXZ: "KeyA",         // A
+            snapPlaneXY: "KeyS",         // S
+            snapPlaneZY: "KeyD",         // D
+            mirrorPlaneXZ: "Shift+KeyA", // Shift + A
+            mirrorPlaneXY: "Shift+KeyS", // Shift + S
+            mirrorPlaneZY: "Shift+KeyD", // Shift + D
             copyFocused: "Mod+KeyD",     // Ctrl/Cmd + D
             mirrorCopy: "Mod+Shift+KeyM",// Ctrl/Cmd + Shift + M
             undo: "Mod+KeyZ",            // Ctrl/Cmd + Z
@@ -136,7 +136,7 @@
             if (raw) {
                 const obj = JSON.parse(raw);
                 const out = {
-                    version: 1,
+                    version: 2,
                     actions: Object.assign({}, DEFAULT_HOTKEYS.actions),
                     kinds: {},
                 };
@@ -186,7 +186,7 @@
     }
 
     function resetHotkeys() {
-        hotkeys.version = 1;
+        hotkeys.version = 2;
         hotkeys.actions = Object.assign({}, DEFAULT_HOTKEYS.actions);
         hotkeys.kinds = {};
         saveHotkeys();
@@ -217,12 +217,12 @@
         {id: "toggleFullscreen", title: "预览全屏 / 退出全屏", desc: "默认 F"},
         {id: "resetCamera", title: "重置镜头", desc: "默认 R"},
         {id: "importJson", title: "导入 JSON", desc: "默认 Ctrl/Cmd+O"},
-        {id: "snapPlaneXZ", title: "切换吸附平面：XZ", desc: "默认 1"},
-        {id: "snapPlaneXY", title: "切换吸附平面：XY", desc: "默认 2"},
-        {id: "snapPlaneZY", title: "切换吸附平面：ZY", desc: "默认 3"},
-        {id: "mirrorPlaneXZ", title: "切换镜像平面：XZ", desc: "默认 Shift+1"},
-        {id: "mirrorPlaneXY", title: "切换镜像平面：XY", desc: "默认 Shift+2"},
-        {id: "mirrorPlaneZY", title: "切换镜像平面：ZY", desc: "默认 Shift+3"},
+        {id: "snapPlaneXZ", title: "切换吸附平面：XZ", desc: "默认 A"},
+        {id: "snapPlaneXY", title: "切换吸附平面：XY", desc: "默认 S"},
+        {id: "snapPlaneZY", title: "切换吸附平面：ZY", desc: "默认 D"},
+        {id: "mirrorPlaneXZ", title: "切换镜像平面：XZ", desc: "默认 Shift+A"},
+        {id: "mirrorPlaneXY", title: "切换镜像平面：XY", desc: "默认 Shift+S"},
+        {id: "mirrorPlaneZY", title: "切换镜像平面：ZY", desc: "默认 Shift+D"},
         {id: "copyFocused", title: "复制当前聚焦卡片", desc: "默认 Ctrl/Cmd + D"},
         {id: "mirrorCopy", title: "镜像复制（直线/Offset）", desc: "默认 Ctrl/Cmd + Shift + M"},
         {id: "deleteFocused", title: "删除当前聚焦卡片", desc: "默认 Backspace"},
@@ -431,7 +431,7 @@
             if (!obj || typeof obj !== "object") throw new Error("invalid json");
             if (!obj.actions || typeof obj.actions !== "object") obj.actions = {};
             if (!obj.kinds || typeof obj.kinds !== "object") obj.kinds = {};
-            hotkeys.version = 1;
+            hotkeys.version = 2;
             hotkeys.actions = Object.assign({}, DEFAULT_HOTKEYS.actions, obj.actions);
             hotkeys.kinds = Object.assign({}, obj.kinds);
             saveHotkeys();
