@@ -42,6 +42,7 @@
             toggleFullscreen: "KeyF",    // F
             resetCamera: "KeyR",         // R
             importJson: "Mod+KeyO",      // Ctrl/Cmd + O
+            toggleSettings: "KeyH",      // H
             toggleParamSync: "KeyY",     // Y
             toggleFilter: "KeyL",        // L
             toggleSnapGrid: "KeyG",      // G
@@ -182,7 +183,7 @@
         if (btnFullscreen) btnFullscreen.title = `快捷键：${hotkeyToHuman(hotkeys.actions.toggleFullscreen || "") || "未设置"}`;
         if (btnResetCamera) btnResetCamera.title = `快捷键：${hotkeyToHuman(hotkeys.actions.resetCamera || "") || "未设置"}`;
         if (btnLoadJson) btnLoadJson.title = `快捷键：${hotkeyToHuman(hotkeys.actions.importJson || "") || "未设置"}`;
-        if (btnHotkeys) btnHotkeys.title = "打开设置";
+        if (btnHotkeys) btnHotkeys.title = `快捷键：${hotkeyToHuman(hotkeys.actions.toggleSettings || "") || "未设置"}`;
     }
 
     function saveHotkeys() {
@@ -226,6 +227,7 @@
         {id: "toggleFullscreen", title: "预览全屏 / 退出全屏", desc: "默认 F"},
         {id: "resetCamera", title: "重置镜头", desc: "默认 R"},
         {id: "importJson", title: "导入 JSON", desc: "默认 Ctrl/Cmd+O"},
+        {id: "toggleSettings", title: "打开/隐藏 设置", desc: "默认 H"},
         {id: "toggleParamSync", title: "打开/隐藏 参数同步", desc: "默认 Y"},
         {id: "toggleFilter", title: "打开/隐藏 过滤器", desc: "默认 L"},
         {id: "toggleSnapGrid", title: "切换吸附网格", desc: "默认 G"},

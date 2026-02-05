@@ -2663,6 +2663,19 @@ function onCanvasClick(ev) {
             return;
         }
 
+        if (hotkeyMatchEvent(e, hotkeys.actions.toggleSettings)) {
+            e.preventDefault();
+            const wasHotkeysOpen = !!(hkModal && !hkModal.classList.contains("hidden"));
+            if (wasHotkeysOpen) hideHotkeysModal();
+            if (modal && !modal.classList.contains("hidden")) hideModal();
+            if (settingsModal && !settingsModal.classList.contains("hidden")) {
+                if (!wasHotkeysOpen) hideSettingsModal();
+            } else {
+                showSettingsModal();
+            }
+            return;
+        }
+
         if (hotkeyMatchEvent(e, hotkeys.actions.toggleFullscreen)) {
             e.preventDefault();
             if (modal && !modal.classList.contains("hidden")) hideModal();
