@@ -22,20 +22,9 @@
             <button id="btnQuickOffset" class="btn">快捷 Offset</button>
             <button id="btnPickLine" class="btn">XZ 拾取直线</button>
             <button id="btnPickPoint" class="btn">点拾取</button>
-            <button id="btnHotkeys" class="btn">快捷键</button>
+            <button id="btnHotkeys" class="btn">设置</button>
             <button id="btnFullscreen" class="btn">预览全屏</button>
             <button id="btnResetCamera" class="btn">重置镜头</button>
-            <div class="theme-switch">
-                <span>主题</span>
-                <select id="themeSelect" class="input theme-select" title="Alt+[ / Alt+] 切换">
-                    <option value="dark-1">夜岚</option>
-                    <option value="dark-2">深潮</option>
-                    <option value="dark-3">焰砂</option>
-                    <option value="light-1">雾蓝</option>
-                    <option value="light-2">杏露</option>
-                    <option value="light-3">薄荷</option>
-                </select>
-            </div>
 
             <span class="sep"></span>
 
@@ -70,14 +59,6 @@
                 </div>
                 <div class="hud-right">
                     <label class="chk">
-                        <input id="chkAxes" type="checkbox" checked />
-                        <span>坐标轴</span>
-                    </label>
-                    <label class="chk">
-                        <input id="chkGrid" type="checkbox" checked />
-                        <span>网格</span>
-                    </label>
-                    <label class="chk">
                         <input id="chkSnapGrid" type="checkbox" checked/>
                         吸附网格
                         <span style="opacity:.7; margin-left:6px;">步长</span>
@@ -104,12 +85,6 @@
                             <option value="ZY">ZY</option>
                         </select>
                     </label>
-                    <label class="chk">
-                        <span style="opacity:.7;">粒子大小</span>
-                        <input id="inpPointSize" type="number" value="0.07" step="0.01" min="0.001" max="5"
-                               style="width:76px; height:24px; margin-left:6px;">
-                    </label>
-
                 </div>
             </div>
             <div id="threeHost" class="three-host"></div>
@@ -159,12 +134,77 @@
         </div>
     </div>
 
-    <!-- 快捷键设置 -->
+    <!-- 设置 -->
+    <div id="settingsMask" class="modal-mask hidden"></div>
+    <div id="settingsModal" class="modal hidden" role="dialog" aria-modal="true">
+        <div class="modal-head">
+            <div class="modal-title">设置</div>
+            <button id="btnCloseSettings" class="btn icon">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="settings-layout">
+                <div class="settings-panel">
+                    <div class="settings-panel-title">数值</div>
+                    <div class="settings-form">
+                        <div class="settings-row">
+                            <div class="settings-label">参数步长</div>
+                            <input id="inpParamStep" class="input" type="number" value="0.1" step="0.01" min="0.000001" />
+                        </div>
+                        <div class="settings-row">
+                            <div class="settings-label">粒子大小</div>
+                            <input id="inpPointSize" class="input" type="number" value="0.07" step="0.01" min="0.001" max="5" />
+                        </div>
+                    </div>
+                </div>
+                <div class="settings-panel">
+                    <div class="settings-panel-title">显示</div>
+                    <div class="settings-form">
+                        <div class="settings-row">
+                            <div class="settings-label">主题</div>
+                            <select id="themeSelect" class="input theme-select" title="Alt+[ / Alt+] 切换">
+                                <option value="dark-1">夜岚</option>
+                                <option value="dark-2">深潮</option>
+                                <option value="dark-3">焰砂</option>
+                                <option value="light-1">雾蓝</option>
+                                <option value="light-2">杏露</option>
+                                <option value="light-3">薄荷</option>
+                            </select>
+                        </div>
+                        <div class="settings-toggles">
+                            <label class="chk settings-toggle">
+                                <input id="chkAxes" type="checkbox" checked />
+                                <span>显示坐标轴</span>
+                            </label>
+                            <label class="chk settings-toggle">
+                                <input id="chkGrid" type="checkbox" checked />
+                                <span>显示网格</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="settings-panel settings-panel-wide">
+                    <div class="settings-panel-title">快捷键</div>
+                    <div class="settings-actions">
+                        <button id="btnOpenHotkeys" class="btn primary">打开快捷键设置</button>
+                        <div class="settings-note">点击配置快捷键。</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal-foot" style="display:flex; gap:8px; align-items:center;">
+            <button id="btnHotkeysExport" class="btn">导出设置</button>
+            <button id="btnHotkeysImport" class="btn">导入设置</button>
+            <input id="fileHotkeys" type="file" accept="application/json" hidden />
+            <span style="flex:1 1 auto;"></span>
+        </div>
+    </div>
+
+    <!-- 快捷键设置（二级菜单） -->
     <div id="hkMask" class="modal-mask hidden"></div>
     <div id="hkModal" class="modal hidden" role="dialog" aria-modal="true">
         <div class="modal-head">
             <div class="modal-title">快捷键设置</div>
-            <input id="hkSearch" class="input" placeholder="搜索：撤销 / 添加元素 / addCircle ..." />
+            <input id="hkSearch" class="input" placeholder="搜索快捷键：撤销 / 添加元素 / addCircle ..." />
             <button id="btnCloseHotkeys" class="btn icon">✕</button>
         </div>
         <div class="modal-body">
@@ -173,9 +213,6 @@
         </div>
         <div class="modal-foot" style="display:flex; gap:8px; align-items:center;">
             <button id="btnHotkeysReset" class="btn">恢复默认</button>
-            <button id="btnHotkeysExport" class="btn">导出按键</button>
-            <button id="btnHotkeysImport" class="btn">导入按键</button>
-            <input id="fileHotkeys" type="file" accept="application/json" hidden />
             <span style="flex:1 1 auto;"></span>
             <button id="btnCloseHotkeys2" class="btn primary">关闭</button>
         </div>

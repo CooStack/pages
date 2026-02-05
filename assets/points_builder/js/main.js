@@ -86,6 +86,10 @@ import {
     const btnHotkeysExport = document.getElementById("btnHotkeysExport");
     const btnHotkeysImport = document.getElementById("btnHotkeysImport");
     const fileHotkeys = document.getElementById("fileHotkeys");
+    const settingsModal = document.getElementById("settingsModal");
+    const settingsMask = document.getElementById("settingsMask");
+    const btnCloseSettings = document.getElementById("btnCloseSettings");
+    const btnOpenHotkeys = document.getElementById("btnOpenHotkeys");
 
     const threeHost = document.getElementById("threeHost");
     const chkAxes = document.getElementById("chkAxes");
@@ -97,6 +101,7 @@ import {
     const selSnapPlane = document.getElementById("selSnapPlane");
     const selMirrorPlane = document.getElementById("selMirrorPlane");
     const inpPointSize = document.getElementById("inpPointSize");
+    const inpParamStep = document.getElementById("inpParamStep");
     const inpSnapStep = document.getElementById("inpSnapStep");
     const statusLinePick = document.getElementById("statusLinePick");
     const statusPoints = document.getElementById("statusPoints");
@@ -137,9 +142,11 @@ import {
         const gridColor = readCssColor("--grid-color", "#223344");
         const pointColor = readCssColor("--point-color", "#ffffff");
         const focusColor = readCssColor("--point-focus", "#ffcc33");
+        const syncColor = readCssColor("--point-sync", "#5dd6ff");
 
         defaultPointColor.set(pointColor);
         focusPointColor.set(focusColor);
+        syncPointColor.set(syncColor);
 
         if (gridHelper && scene) {
             const wasVisible = gridHelper.visible;
@@ -176,6 +183,7 @@ import {
             const next = normalizeTheme(themeSelect.value);
             applyTheme(next);
             localStorage.setItem(THEME_KEY, next);
+            saveSettingsToStorage();
         });
     };
     const cycleTheme = (dir) => {
@@ -219,9 +227,99 @@ import {
         return Math.min(Math.max(Number(v) || 0, lo), hi);
     }
 
+    const SETTINGS_STORAGE_KEY = "pb_settings_v1";
+    let paramStep = 0.1;
+
+    function normalizeParamStep(v) {
+        const n = parseFloat(v);
+        if (!Number.isFinite(n) || n <= 0) return 0.1;
+        return Math.max(0.000001, n);
+    }
+
+    function applyParamStepToInputs() {
+        const step = String(paramStep);
+        const inputs = document.querySelectorAll('input[type="number"]');
+        inputs.forEach((el) => {
+            if (el.id === "inpSnapStep") return;
+            if (el.id === "inpParamStep") return;
+            el.step = step;
+        });
+    }
+
+    function setParamStep(v, opts = {}) {
+        const next = normalizeParamStep(v);
+        paramStep = next;
+        if (inpParamStep && inpParamStep.value !== String(next)) {
+            inpParamStep.value = String(next);
+        }
+        applyParamStepToInputs();
+        if (!opts.skipSave) saveSettingsToStorage();
+    }
+
+    function collectSettingsPayload() {
+        const currentTheme = normalizeTheme(
+            (themeSelect && themeSelect.value) ||
+            document.body.getAttribute("data-theme") ||
+            localStorage.getItem(THEME_KEY) ||
+            "dark-1"
+        );
+        return {
+            paramStep,
+            showAxes: chkAxes ? !!chkAxes.checked : true,
+            showGrid: chkGrid ? !!chkGrid.checked : true,
+            theme: currentTheme,
+            pointSize
+        };
+    }
+
+    function saveSettingsToStorage() {
+        try {
+            localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(collectSettingsPayload()));
+        } catch (e) {
+            console.warn("saveSettings failed:", e);
+        }
+    }
+
+    function applySettingsPayload(payload, opts = {}) {
+        if (!payload || typeof payload !== "object") return;
+        if (payload.paramStep !== undefined) {
+            setParamStep(payload.paramStep, { skipSave: true });
+        }
+        if (payload.theme) {
+            const next = normalizeTheme(payload.theme);
+            applyTheme(next);
+            localStorage.setItem(THEME_KEY, next);
+        }
+        if (payload.showAxes !== undefined && chkAxes) {
+            chkAxes.checked = !!payload.showAxes;
+            if (axesHelper) axesHelper.visible = chkAxes.checked;
+            if (axisLabelGroup) axisLabelGroup.visible = chkAxes.checked;
+        }
+        if (payload.showGrid !== undefined && chkGrid) {
+            chkGrid.checked = !!payload.showGrid;
+            if (gridHelper) gridHelper.visible = chkGrid.checked;
+        }
+        if (payload.pointSize !== undefined) {
+            setPointSize(payload.pointSize);
+            if (inpPointSize) inpPointSize.value = String(pointSize);
+        }
+        if (!opts.skipSave) saveSettingsToStorage();
+    }
+
+    function loadSettingsFromStorage() {
+        try {
+            const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+            if (!raw) return;
+            const obj = JSON.parse(raw);
+            applySettingsPayload(obj, { skipSave: true });
+        } catch (e) {
+            console.warn("loadSettings failed:", e);
+        }
+    }
+
     let getFilterScope, saveRootFilter, isFilterActive, filterAllows, getVisibleEntries, getVisibleIndices, swapInList, findVisibleSwapIndex, cleanupFilterMenus;
     let renderCards, renderParamsEditors, layoutActionOverflow, initCollapseAllControls, setupListDropZone, addQuickOffsetTo;
-    let createFilterControls, createParamSyncControls, renderSyncMenu, bindParamSyncListeners, isSyncSelectableEvent, toggleSyncTarget, paramSync;
+    let createFilterControls, createParamSyncControls, renderSyncMenu, bindParamSyncListeners, isSyncSelectableEvent, toggleSyncTarget, setSyncEnabled, paramSync;
     let hotkeys, hotkeyToHuman, hotkeyMatchEvent, normalizeHotkey, shouldIgnorePlainHotkeys;
     let openHotkeysModal, hideHotkeysModal, beginHotkeyCapture, refreshHotkeyHints, handleHotkeyCaptureKeydown;
 
@@ -555,6 +653,7 @@ import {
         btnResetCamera,
         btnLoadJson,
         btnHotkeys,
+        btnOpenHotkeys,
         btnCloseHotkeys,
         btnCloseHotkeys2,
         btnHotkeysReset,
@@ -562,9 +661,13 @@ import {
         btnHotkeysImport,
         fileHotkeys,
         cardSearch,
+        settingsModal,
+        settingsMask,
         KIND,
         showToast,
-        downloadText
+        downloadText,
+        getSettingsPayload: collectSettingsPayload,
+        applySettingsPayload
     });
     ({
         hotkeys,
@@ -689,7 +792,8 @@ import {
         num,
         armHistoryOnFocus,
         historyCapture,
-        setActiveVecTarget: (target) => { activeVecTarget = target; }
+        setActiveVecTarget: (target) => { activeVecTarget = target; },
+        getParamStep: () => paramStep
     });
 
     // 用户要求：左侧卡片允许“全部删除”（不再强制至少保留 axis）。
@@ -713,6 +817,22 @@ import {
             fn(n);
             if (isBuilderContainerKind(n.kind) && Array.isArray(n.children)) {
                 forEachNode(n.children, fn);
+            }
+        }
+    }
+
+    function collapseAllNodes(list) {
+        const arr = list || [];
+        for (const n of arr) {
+            if (!n) continue;
+            n.collapsed = true;
+            if (Array.isArray(n.terms)) {
+                for (const t of n.terms) {
+                    if (t) t.collapsed = true;
+                }
+            }
+            if (isBuilderContainerKind(n.kind) && Array.isArray(n.children)) {
+                collapseAllNodes(n.children);
             }
         }
     }
@@ -870,6 +990,7 @@ import {
                 }
             }
         }
+        scheduleAutoSave();
         return true;
     }
 
@@ -1133,8 +1254,10 @@ import {
     let defaultColorBuf = null;        // Float32Array：默认颜色缓存（与 position 等长）
     const DEFAULT_POINT_HEX = 0xffffff;
     const FOCUS_POINT_HEX = 0xffcc33;
+    const SYNC_POINT_HEX = 0x5dd6ff;
     const defaultPointColor = new THREE.Color(DEFAULT_POINT_HEX);
     const focusPointColor = new THREE.Color(FOCUS_POINT_HEX);
+    const syncPointColor = new THREE.Color(SYNC_POINT_HEX);
 
     let pickMarkers = [];
     let pointSize = 0.2;     // ✅ 粒子大小（PointsMaterial.size）
@@ -1183,7 +1306,7 @@ import {
     }
 
     function shouldIgnoreArrowPan() {
-        if ((modal && !modal.classList.contains("hidden")) || (hkModal && !hkModal.classList.contains("hidden"))) return true;
+        if ((modal && !modal.classList.contains("hidden")) || (hkModal && !hkModal.classList.contains("hidden")) || (settingsModal && !settingsModal.classList.contains("hidden"))) return true;
         const ae = document.activeElement;
         if (!ae) return false;
         const tag = (ae.tagName || "").toUpperCase();
@@ -1510,10 +1633,12 @@ import {
         axesHelper = new THREE.AxesHelper(5);
         scene.add(axesHelper);
         buildAxisLabels();
+        if (chkAxes) axesHelper.visible = chkAxes.checked;
 
         gridHelper = new THREE.GridHelper(256, 256, 0x223344, 0x223344);
         gridHelper.position.y = -0.01;
         scene.add(gridHelper);
+        if (chkGrid) gridHelper.visible = chkGrid.checked;
         applySceneTheme();
 
         scene.add(new THREE.AmbientLight(0xffffff, 0.8));
@@ -1537,8 +1662,12 @@ import {
         chkAxes.addEventListener("change", () => {
             axesHelper.visible = chkAxes.checked;
             if (axisLabelGroup) axisLabelGroup.visible = chkAxes.checked;
+            saveSettingsToStorage();
         });
-        chkGrid.addEventListener("change", () => gridHelper.visible = chkGrid.checked);
+        chkGrid.addEventListener("change", () => {
+            gridHelper.visible = chkGrid.checked;
+            saveSettingsToStorage();
+        });
         if (btnResetCamera) {
             btnResetCamera.addEventListener("click", () => resetCameraToPoints());
         }
@@ -1569,6 +1698,7 @@ import {
             inpPointSize.value = String(pointSize);
             inpPointSize.addEventListener("input", () => {
                 setPointSize(inpPointSize.value);
+                saveSettingsToStorage();
             });
         }
 
@@ -1697,11 +1827,27 @@ import {
         // 先恢复默认色
         attr.array.set(defaultColorBuf);
 
-        // 再打聚焦色
-        const seg = focusedNodeId ? nodePointSegments.get(focusedNodeId) : null;
-        if (seg && seg.end > seg.start) {
+        // 参数同步选中：统一颜色标记
+        const syncIds = (paramSync && paramSync.selectedIds) ? paramSync.selectedIds : null;
+        if (syncIds && syncIds.size) {
+            const cSync = syncPointColor;
+            for (const id of syncIds) {
+                const seg = nodePointSegments.get(id);
+                if (!seg || seg.end <= seg.start) continue;
+                for (let i = seg.start; i < seg.end; i++) {
+                    const k = i * 3;
+                    attr.array[k + 0] = cSync.r;
+                    attr.array[k + 1] = cSync.g;
+                    attr.array[k + 2] = cSync.b;
+                }
+            }
+        }
+
+        // 聚焦色优先覆盖
+        const focusSeg = focusedNodeId ? nodePointSegments.get(focusedNodeId) : null;
+        if (focusSeg && focusSeg.end > focusSeg.start) {
             const c1 = focusPointColor;
-            for (let i = seg.start; i < seg.end; i++) {
+            for (let i = focusSeg.start; i < focusSeg.end; i++) {
                 const k = i * 3;
                 attr.array[k + 0] = c1.r;
                 attr.array[k + 1] = c1.g;
@@ -1816,24 +1962,79 @@ function getParticleSnapFromEvent(ev) {
 
 function scrollCardToTop(cardEl) {
     if (!cardEl || !elCardsRoot) return;
-    const c = elCardsRoot;
-    const cr = c.getBoundingClientRect();
-    const r = cardEl.getBoundingClientRect();
-    const delta = (r.top - cr.top);
-    // 让卡片顶端尽量贴近容器顶端
-    c.scrollTop += delta - 8;
+    scrollCardIntoContainer(elCardsRoot, cardEl);
 }
 
-function focusCardById(id, recordHistory = true, scrollToTop = true) {
+function scrollCardIntoContainer(containerEl, cardEl, offset = 8) {
+    if (!containerEl || !cardEl) return;
+    const cr = containerEl.getBoundingClientRect();
+    const r = cardEl.getBoundingClientRect();
+    const delta = (r.top - cr.top);
+    containerEl.scrollTop += delta - offset;
+}
+
+function getCardScrollContainer(cardEl) {
+    if (!cardEl) return elCardsRoot;
+    const sub = cardEl.closest ? cardEl.closest(".subcards") : null;
+    return sub || elCardsRoot;
+}
+
+function revealCardPathById(id) {
+    const ctx = findNodeContextById(id);
+    if (!ctx || !ctx.node) return false;
+    let changed = false;
+    const list = [];
+    list.push(ctx.node);
+    let parent = ctx.parentNode;
+    while (parent && parent.id) {
+        list.push(parent);
+        const next = findNodeContextById(parent.id);
+        parent = next ? (next.parentNode || null) : null;
+    }
+    for (const n of list) {
+        if (n.collapsed) {
+            n.collapsed = false;
+            changed = true;
+        }
+        if (n.folded && (isBuilderContainerKind(n.kind) || n.kind === "add_fourier_series")) {
+            n.folded = false;
+            changed = true;
+        }
+    }
+    return changed;
+}
+
+function focusCardById(id, recordHistory = true, scrollToTop = true, revealPath = false) {
     if (!id) return false;
+    const ctx = findNodeContextById(id);
+    const parentNode = ctx ? ctx.parentNode : null;
+    const parentIsBuilder = parentNode && isBuilderContainerKind(parentNode.kind);
+    const parentId = parentIsBuilder ? parentNode.id : null;
+    const needRender = revealPath ? revealCardPathById(id) : false;
     setFocusedNode(id, recordHistory);
+    if (needRender) renderAll();
     requestAnimationFrame(() => {
         const el = elCardsRoot ? elCardsRoot.querySelector(`.card[data-id="${id}"]`) : null;
+        const parentEl = parentId ? elCardsRoot.querySelector(`.card[data-id="${parentId}"]`) : null;
+        if (parentEl) {
+            const container = getCardScrollContainer(parentEl);
+            scrollCardIntoContainer(container, parentEl);
+        } else if (scrollToTop && el) {
+            const container = getCardScrollContainer(el);
+            scrollCardIntoContainer(container, el);
+        }
         if (el) {
             try { el.focus({ preventScroll: true }); } catch { try { el.focus(); } catch {} }
-            if (scrollToTop) {
-                try { scrollCardToTop(el); } catch {}
-            }
+        }
+        if (parentEl && el) {
+            requestAnimationFrame(() => {
+                const parentEl2 = elCardsRoot ? elCardsRoot.querySelector(`.card[data-id="${parentId}"]`) : null;
+                const el2 = elCardsRoot ? elCardsRoot.querySelector(`.card[data-id="${id}"]`) : null;
+                const subcards = parentEl2 ? parentEl2.querySelector(".subcards") : null;
+                if (subcards && el2) {
+                    scrollCardIntoContainer(subcards, el2);
+                }
+            });
         }
     });
     return true;
@@ -1862,13 +2063,21 @@ function onCanvasClick(ev) {
     if (idx !== null) {
         const ownerId = ownerIdForPointIndex(idx);
         if (ownerId) {
-            focusCardById(ownerId, true, true);
+            const ctx = findNodeContextById(ownerId);
+            if (paramSync && paramSync.open && ctx && ctx.node) {
+                toggleSyncTarget(ctx.node);
+            }
+            focusCardById(ownerId, true, true, true);
             return;
         }
     }
 
     // 点到空白处：清空焦点
-    if (focusedNodeId) setFocusedNode(null, true);
+    if (focusedNodeId) {
+        const scopeId = getScopeIdForNodeId(focusedNodeId);
+        if (isCollapseAllActive(scopeId)) return;
+        setFocusedNode(null, true);
+    }
 }
 
     function animate() {
@@ -2145,12 +2354,28 @@ function onCanvasClick(ev) {
         applyCollapseAllStates();
         renderCards();
         if (paramSync && paramSync.open && typeof renderSyncMenu === "function") renderSyncMenu();
+        applyParamStepToInputs();
         // 如果选中的卡片已不存在，则清空
         if (focusedNodeId && !linePickMode) {
             const ctx = findNodeContextById(focusedNodeId);
             if (!ctx) focusedNodeId = null;
         }
         rebuildPreviewAndKotlin();
+    }
+
+    // ------- Settings modal -------
+    function showSettingsModal() {
+        if (!settingsModal || !settingsMask) return;
+        settingsModal.classList.remove("hidden");
+        settingsMask.classList.remove("hidden");
+    }
+
+    function hideSettingsModal() {
+        if (!settingsModal || !settingsMask) return;
+        settingsModal.classList.add("hidden");
+        settingsMask.classList.add("hidden");
+        settingsModal.classList.remove("under");
+        settingsMask.classList.remove("under");
     }
 
 
@@ -2354,9 +2579,19 @@ function onCanvasClick(ev) {
                 hideHotkeysModal();
                 return;
             }
+            if (settingsModal && !settingsModal.classList.contains("hidden")) {
+                e.preventDefault();
+                hideSettingsModal();
+                return;
+            }
             if (modal && !modal.classList.contains("hidden")) {
                 e.preventDefault();
                 hideModal();
+                return;
+            }
+            if (paramSync && paramSync.open && typeof setSyncEnabled === "function") {
+                e.preventDefault();
+                setSyncEnabled(false);
                 return;
             }
         }
@@ -2392,7 +2627,7 @@ function onCanvasClick(ev) {
 
         // 2.5) Delete focused card (plain key)
         // 为了避免“在弹窗里误删卡片”，当任意弹窗打开时不响应删除快捷键
-        if ((modal && !modal.classList.contains("hidden")) || (hkModal && !hkModal.classList.contains("hidden"))) {
+        if ((modal && !modal.classList.contains("hidden")) || (hkModal && !hkModal.classList.contains("hidden")) || (settingsModal && !settingsModal.classList.contains("hidden"))) {
             // 仍然允许 undo/redo 在上面已经处理
         } else {
             const ae = document.activeElement;
@@ -2419,6 +2654,9 @@ function onCanvasClick(ev) {
             if (hkModal && !hkModal.classList.contains("hidden")) {
                 hideHotkeysModal();
             }
+            if (settingsModal && !settingsModal.classList.contains("hidden")) {
+                hideSettingsModal();
+            }
             const ctx = getInsertContextFromFocus();
             const ownerNodeId = (ctx && ctx.ownerNode && isBuilderContainerKind(ctx.ownerNode.kind)) ? ctx.ownerNode.id : null;
             openModal(ctx.list, ctx.insertIndex, ctx.label, ownerNodeId);
@@ -2429,6 +2667,7 @@ function onCanvasClick(ev) {
             e.preventDefault();
             if (modal && !modal.classList.contains("hidden")) hideModal();
             if (hkModal && !hkModal.classList.contains("hidden")) hideHotkeysModal();
+            if (settingsModal && !settingsModal.classList.contains("hidden")) hideSettingsModal();
             toggleFullscreen();
             return;
         }
@@ -2443,7 +2682,34 @@ function onCanvasClick(ev) {
             e.preventDefault();
             if (modal && !modal.classList.contains("hidden")) hideModal();
             if (hkModal && !hkModal.classList.contains("hidden")) hideHotkeysModal();
+            if (settingsModal && !settingsModal.classList.contains("hidden")) hideSettingsModal();
             triggerImportJson();
+            return;
+        }
+
+        if (hotkeyMatchEvent(e, hotkeys.actions.toggleParamSync)) {
+            e.preventDefault();
+            if (paramSync && paramSync.anchor) {
+                paramSync.anchor.click();
+            } else if (typeof setSyncEnabled === "function") {
+                setSyncEnabled(!(paramSync && paramSync.open));
+            }
+            return;
+        }
+        if (hotkeyMatchEvent(e, hotkeys.actions.toggleFilter)) {
+            e.preventDefault();
+            const btn = document.querySelector(".panel.left .panel-tools .filter-wrap button");
+            if (btn) btn.click();
+            return;
+        }
+        if (hotkeyMatchEvent(e, hotkeys.actions.toggleSnapGrid)) {
+            e.preventDefault();
+            if (chkSnapGrid) chkSnapGrid.click();
+            return;
+        }
+        if (hotkeyMatchEvent(e, hotkeys.actions.toggleSnapParticle)) {
+            e.preventDefault();
+            if (chkSnapParticle) chkSnapParticle.click();
             return;
         }
 
@@ -2453,6 +2719,7 @@ function onCanvasClick(ev) {
             // 进入拾取模式前，关闭弹窗，避免鼠标事件被遮罩拦截
             if (modal && !modal.classList.contains("hidden")) hideModal();
             if (hkModal && !hkModal.classList.contains("hidden")) hideHotkeysModal();
+            if (settingsModal && !settingsModal.classList.contains("hidden")) hideSettingsModal();
 
             if (linePickMode) stopLinePick();
             else {
@@ -2467,6 +2734,7 @@ function onCanvasClick(ev) {
             e.preventDefault();
             if (modal && !modal.classList.contains("hidden")) hideModal();
             if (hkModal && !hkModal.classList.contains("hidden")) hideHotkeysModal();
+            if (settingsModal && !settingsModal.classList.contains("hidden")) hideSettingsModal();
             if (pointPickMode) stopPointPick();
             else {
                 if (linePickMode) stopLinePick();
@@ -2629,7 +2897,8 @@ function onCanvasClick(ev) {
         findNodeContextById,
         renderCards: () => renderCards(),
         rebuildPreviewAndKotlin: () => rebuildPreviewAndKotlin(),
-        renderParamsEditors: (...args) => renderParamsEditors(...args)
+        renderParamsEditors: (...args) => renderParamsEditors(...args),
+        onSyncSelectionChange: () => updateFocusColors()
     });
     ({
         getFilterScope,
@@ -2647,6 +2916,7 @@ function onCanvasClick(ev) {
         bindParamSyncListeners,
         isSyncSelectableEvent,
         toggleSyncTarget,
+        setSyncEnabled,
         paramSync
     } = filterSystem);
 
@@ -2707,6 +2977,14 @@ function onCanvasClick(ev) {
             if (inpProjectName.value !== projectName) inpProjectName.value = projectName;
         });
     }
+    if (inpParamStep) {
+        inpParamStep.addEventListener("input", () => {
+            setParamStep(inpParamStep.value);
+        });
+    }
+    btnHotkeys && btnHotkeys.addEventListener("click", showSettingsModal);
+    btnCloseSettings && btnCloseSettings.addEventListener("click", hideSettingsModal);
+    settingsMask && settingsMask.addEventListener("click", hideSettingsModal);
 
     btnAddCard.addEventListener("click", () => {
             const ctx = getInsertContextFromFocus();
@@ -2781,6 +3059,7 @@ function onCanvasClick(ev) {
             state = obj;
             ensureAxisEverywhere();
             resetCollapseScopes();
+            collapseAllNodes(state.root.children);
             const rawName = (f.name || "").replace(/\.[^/.]+$/, "");
             const nextName = sanitizeFileBase(rawName || "");
             if (nextName) {
@@ -2810,6 +3089,7 @@ function onCanvasClick(ev) {
             target.children = obj.root.children;
             ensureAxisInList(target.children);
             resetCollapseScopes();
+            collapseAllNodes(target.children);
             renderAll();
             showToast("导入成功", "success");
         } catch (e) {
@@ -2830,6 +3110,7 @@ function onCanvasClick(ev) {
     // -------------------------
     // Boot
     // -------------------------
+    loadSettingsFromStorage();
     initTheme();
     bindThemeHotkeys();
     applyLayoutState(false);

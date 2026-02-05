@@ -1,5 +1,19 @@
 ﻿export function createCardInputs(ctx) {
-    const { num, armHistoryOnFocus, historyCapture, setActiveVecTarget } = ctx || {};
+    const { num, armHistoryOnFocus, historyCapture, setActiveVecTarget, getParamStep } = ctx || {};
+
+    function countDecimalsFromString(value) {
+        const text = String(value ?? "").trim().toLowerCase();
+        if (!text) return 0;
+        const parts = text.split("e-");
+        const base = parts[0];
+        const dot = base.indexOf(".");
+        let dec = dot >= 0 ? (base.length - dot - 1) : 0;
+        if (parts.length > 1) {
+            const exp = parseInt(parts[1], 10);
+            if (Number.isFinite(exp)) dec += exp;
+        }
+        return dec;
+    }
 
     function row(label, editorEl) {
         const r = document.createElement("div");
@@ -16,9 +30,24 @@
         const i = document.createElement("input");
         i.className = "input";
         i.type = "number";
-        i.step = "any";
+        const step = (typeof getParamStep === "function") ? getParamStep() : null;
+        i.step = Number.isFinite(step) ? String(step) : "any";
         i.value = String(value ?? 0);
         armHistoryOnFocus && armHistoryOnFocus(i, "edit");
+        i.addEventListener("keydown", (e) => {
+            if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+            const liveStep = (typeof getParamStep === "function") ? getParamStep() : null;
+            if (!Number.isFinite(liveStep) || liveStep <= 0) return;
+            e.preventDefault();
+            const curStr = i.value;
+            const cur = parseFloat(curStr);
+            const base = Number.isFinite(cur) ? cur : 0;
+            const next = base + (e.key === "ArrowUp" ? liveStep : -liveStep);
+            const precision = Math.max(countDecimalsFromString(curStr), countDecimalsFromString(liveStep));
+            const fixed = Number.isFinite(next) ? Number(next.toFixed(Math.min(12, precision + 2))) : next;
+            i.value = String(fixed);
+            i.dispatchEvent(new Event("input", { bubbles: true }));
+        });
         i.addEventListener("input", () => onInput(num ? num(i.value) : Number(i.value)));
         return i;
     }

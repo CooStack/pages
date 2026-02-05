@@ -7,7 +7,8 @@
         findNodeContextById,
         renderCards,
         rebuildPreviewAndKotlin,
-        renderParamsEditors
+        renderParamsEditors,
+        onSyncSelectionChange
     } = ctx || {};
 
     const FILTER_STORAGE_KEY = "pb_root_filter_v2";
@@ -323,6 +324,7 @@
     // -------------------------
     const paramSync = {
         open: false,
+        menuOpen: false,
         kind: null,
         selectedIds: new Set(),
         snapshots: new Map(),
@@ -365,10 +367,6 @@
 
     function openSyncMenu(wrap, menu, anchor) {
         if (!menu) return;
-        if (menu.classList.contains("open")) {
-            closeSyncMenu();
-            return;
-        }
         closeSyncMenu();
         wrap && wrap.classList.add("open");
         menu.classList.add("open");
@@ -384,7 +382,6 @@
     function bindGlobalSyncClose() {
         if (syncMenuBound) return;
         syncMenuBound = true;
-        document.addEventListener("click", () => closeSyncMenu());
         window.addEventListener("resize", () => updateActiveSyncMenuPosition());
         window.addEventListener("scroll", () => updateActiveSyncMenuPosition(), true);
     }
@@ -433,18 +430,36 @@
         return out;
     }
 
-    function setSyncMenuOpen(open) {
-        paramSync.open = !!open;
-        if (paramSync.open) {
-            openSyncMenu(paramSync.wrap, paramSync.menu, paramSync.anchor);
-            renderSyncMenu();
-        } else {
-            closeSyncMenu();
-        }
+    function updateSyncButtonState() {
+        if (paramSync.anchor) paramSync.anchor.classList.toggle("primary", paramSync.open);
+    }
+
+    function showSyncMenu() {
+        paramSync.menuOpen = true;
+        openSyncMenu(paramSync.wrap, paramSync.menu, paramSync.anchor);
+        renderSyncMenu();
+    }
+
+    function hideSyncMenu() {
+        if (!paramSync.menuOpen) return;
+        paramSync.menuOpen = false;
+        closeSyncMenu();
+    }
+
+    function setSyncEnabled(enabled) {
+        paramSync.open = !!enabled;
+        updateSyncButtonState();
+        if (!paramSync.open) hideSyncMenu();
     }
 
     function toggleSyncMenu() {
-        setSyncMenuOpen(!paramSync.open);
+        if (!paramSync.open) {
+            setSyncEnabled(true);
+            showSyncMenu();
+            return;
+        }
+        if (paramSync.menuOpen) hideSyncMenu();
+        else showSyncMenu();
     }
 
     function clearSyncTargets() {
@@ -454,6 +469,7 @@
         paramSync.kind = null;
         ids.forEach(updateSyncCardUI);
         renderSyncMenu();
+        if (typeof onSyncSelectionChange === "function") onSyncSelectionChange();
     }
 
     function addSyncTarget(node) {
@@ -468,6 +484,7 @@
         paramSync.snapshots.set(node.id, deepClone ? deepClone(node.params || {}) : JSON.parse(JSON.stringify(node.params || {})));
         updateSyncCardUI(node.id);
         renderSyncMenu();
+        if (typeof onSyncSelectionChange === "function") onSyncSelectionChange();
     }
 
     function removeSyncTarget(id) {
@@ -478,6 +495,7 @@
         updateSyncCardUI(id);
         if (paramSync.selectedIds.size === 0) paramSync.kind = null;
         renderSyncMenu();
+        if (typeof onSyncSelectionChange === "function") onSyncSelectionChange();
     }
 
     function toggleSyncTarget(node) {
@@ -638,11 +656,16 @@
         clearBtn.className = "btn small";
         clearBtn.textContent = "清空";
         clearBtn.addEventListener("click", clearSyncTargets);
+        const hideBtn = document.createElement("button");
+        hideBtn.className = "btn small";
+        hideBtn.textContent = "隐藏";
+        hideBtn.addEventListener("click", () => hideSyncMenu());
         const closeBtn = document.createElement("button");
         closeBtn.className = "btn small";
         closeBtn.textContent = "关闭";
-        closeBtn.addEventListener("click", () => setSyncMenuOpen(false));
+        closeBtn.addEventListener("click", () => setSyncEnabled(false));
         actions.appendChild(clearBtn);
+        actions.appendChild(hideBtn);
         actions.appendChild(closeBtn);
 
         menu.appendChild(hint);
@@ -707,6 +730,7 @@
         bindParamSyncListeners,
         isSyncSelectableEvent,
         toggleSyncTarget,
+        setSyncEnabled,
         updateSyncCardUI,
         syncFromNodeId,
         paramSync

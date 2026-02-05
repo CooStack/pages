@@ -14,6 +14,7 @@
         btnResetCamera,
         btnLoadJson,
         btnHotkeys,
+        btnOpenHotkeys,
         btnCloseHotkeys,
         btnCloseHotkeys2,
         btnHotkeysReset,
@@ -21,9 +22,13 @@
         btnHotkeysImport,
         fileHotkeys,
         cardSearch,
+        settingsModal,
+        settingsMask,
         KIND,
         showToast,
-        downloadText
+        downloadText,
+        getSettingsPayload,
+        applySettingsPayload
     } = ctx || {};
 
     const HOTKEY_STORAGE_KEY = "pb_hotkeys_v2";
@@ -37,6 +42,10 @@
             toggleFullscreen: "KeyF",    // F
             resetCamera: "KeyR",         // R
             importJson: "Mod+KeyO",      // Ctrl/Cmd + O
+            toggleParamSync: "KeyY",     // Y
+            toggleFilter: "KeyL",        // L
+            toggleSnapGrid: "KeyG",      // G
+            toggleSnapParticle: "KeyP",  // P
             snapPlaneXZ: "KeyA",         // A
             snapPlaneXY: "KeyS",         // S
             snapPlaneZY: "KeyD",         // D
@@ -173,7 +182,7 @@
         if (btnFullscreen) btnFullscreen.title = `快捷键：${hotkeyToHuman(hotkeys.actions.toggleFullscreen || "") || "未设置"}`;
         if (btnResetCamera) btnResetCamera.title = `快捷键：${hotkeyToHuman(hotkeys.actions.resetCamera || "") || "未设置"}`;
         if (btnLoadJson) btnLoadJson.title = `快捷键：${hotkeyToHuman(hotkeys.actions.importJson || "") || "未设置"}`;
-        if (btnHotkeys) btnHotkeys.title = "打开快捷键设置";
+        if (btnHotkeys) btnHotkeys.title = "打开设置";
     }
 
     function saveHotkeys() {
@@ -217,6 +226,10 @@
         {id: "toggleFullscreen", title: "预览全屏 / 退出全屏", desc: "默认 F"},
         {id: "resetCamera", title: "重置镜头", desc: "默认 R"},
         {id: "importJson", title: "导入 JSON", desc: "默认 Ctrl/Cmd+O"},
+        {id: "toggleParamSync", title: "打开/隐藏 参数同步", desc: "默认 Y"},
+        {id: "toggleFilter", title: "打开/隐藏 过滤器", desc: "默认 L"},
+        {id: "toggleSnapGrid", title: "切换吸附网格", desc: "默认 G"},
+        {id: "toggleSnapParticle", title: "切换吸附粒子", desc: "默认 P"},
         {id: "snapPlaneXZ", title: "切换吸附平面：XZ", desc: "默认 A"},
         {id: "snapPlaneXY", title: "切换吸附平面：XY", desc: "默认 S"},
         {id: "snapPlaneZY", title: "切换吸附平面：ZY", desc: "默认 D"},
@@ -233,11 +246,17 @@
     // ✅ 解决：从「添加元素」窗口内打开快捷键设置会遮挡：采用“叠窗 + 底层磨砂”
     // 打开快捷键时：让添加元素弹窗进入 under（模糊、不可交互）；关闭快捷键时恢复。
     let _addModalWasOpenWhenHotkeys = false;
+    let _settingsWasOpenWhenHotkeys = false;
     function openHotkeysModal() {
         _addModalWasOpenWhenHotkeys = !!(modal && !modal.classList.contains("hidden"));
         if (_addModalWasOpenWhenHotkeys) {
             try { modal.classList.add("under"); } catch {}
             try { modalMask && modalMask.classList.add("under"); } catch {}
+        }
+        _settingsWasOpenWhenHotkeys = !!(settingsModal && !settingsModal.classList.contains("hidden"));
+        if (_settingsWasOpenWhenHotkeys) {
+            try { settingsModal.classList.add("under"); } catch {}
+            try { settingsMask && settingsMask.classList.add("under"); } catch {}
         }
         showHotkeysModal();
     }
@@ -269,6 +288,14 @@
             if (modal && !modal.classList.contains("hidden")) {
                 modalMask && modalMask.classList.remove("hidden");
                 try { cardSearch && cardSearch.focus(); } catch {}
+            }
+        }
+        if (_settingsWasOpenWhenHotkeys) {
+            _settingsWasOpenWhenHotkeys = false;
+            try { settingsModal && settingsModal.classList.remove("under"); } catch {}
+            try { settingsMask && settingsMask.classList.remove("under"); } catch {}
+            if (settingsModal && !settingsModal.classList.contains("hidden")) {
+                settingsMask && settingsMask.classList.remove("hidden");
             }
         }
     }
@@ -406,7 +433,7 @@
     }
 
     // Hotkeys modal events
-    btnHotkeys && btnHotkeys.addEventListener("click", openHotkeysModal);
+    btnOpenHotkeys && btnOpenHotkeys.addEventListener("click", openHotkeysModal);
     btnCloseHotkeys && btnCloseHotkeys.addEventListener("click", hideHotkeysModal);
     btnCloseHotkeys2 && btnCloseHotkeys2.addEventListener("click", hideHotkeysModal);
     hkMask && hkMask.addEventListener("click", hideHotkeysModal);
@@ -418,7 +445,13 @@
     });
 
     btnHotkeysExport && btnHotkeysExport.addEventListener("click", () => {
-        downloadText && downloadText("hotkeys.json", JSON.stringify(hotkeys, null, 2), "application/json");
+        const settings = (typeof getSettingsPayload === "function") ? getSettingsPayload() : null;
+        const payload = {
+            version: 1,
+            hotkeys,
+            settings: settings || null
+        };
+        downloadText && downloadText("settings.json", JSON.stringify(payload, null, 2), "application/json");
     });
 
     btnHotkeysImport && btnHotkeysImport.addEventListener("click", () => fileHotkeys && fileHotkeys.click());
@@ -429,13 +462,21 @@
             const text = await f.text();
             const obj = JSON.parse(text);
             if (!obj || typeof obj !== "object") throw new Error("invalid json");
-            if (!obj.actions || typeof obj.actions !== "object") obj.actions = {};
-            if (!obj.kinds || typeof obj.kinds !== "object") obj.kinds = {};
-            hotkeys.version = 2;
-            hotkeys.actions = Object.assign({}, DEFAULT_HOTKEYS.actions, obj.actions);
-            hotkeys.kinds = Object.assign({}, obj.kinds);
-            saveHotkeys();
-            renderHotkeysList();
+            const hkObj = (obj.hotkeys && typeof obj.hotkeys === "object")
+                ? obj.hotkeys
+                : ((obj.actions || obj.kinds) ? obj : null);
+            if (hkObj) {
+                if (!hkObj.actions || typeof hkObj.actions !== "object") hkObj.actions = {};
+                if (!hkObj.kinds || typeof hkObj.kinds !== "object") hkObj.kinds = {};
+                hotkeys.version = 2;
+                hotkeys.actions = Object.assign({}, DEFAULT_HOTKEYS.actions, hkObj.actions);
+                hotkeys.kinds = Object.assign({}, hkObj.kinds);
+                saveHotkeys();
+                renderHotkeysList();
+            }
+            if (obj.settings && typeof applySettingsPayload === "function") {
+                applySettingsPayload(obj.settings);
+            }
             showToast && showToast("导入成功", "success");
         } catch (e) {
             showToast && showToast(`导入失败-格式错误(${e.message || e})`, "error");
